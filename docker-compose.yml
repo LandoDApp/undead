@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: undead-postgres
+    environment:
+      POSTGRES_USER: undead
+      POSTGRES_PASSWORD: undead_dev
+      POSTGRES_DB: undead
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U undead"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    container_name: undead-valhalla
+    ports:
+      - "8002:8002"
+    volumes:
+      - valhalla-data:/custom_files
+    environment:
+      - tile_urls=https://download.geofabrik.de/europe/germany/bremen-latest.osm.pbf
+      - serve_tiles=True
+      - build_elevation=False
+      - build_admins=False
+      - build_time_zones=False
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  api:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: undead-api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://undead:undead_dev@postgres:5432/undead
+      BETTER_AUTH_SECRET: dev-secret-change-in-production
+      BETTER_AUTH_URL: http://localhost:3000
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@undead.app
+      VALHALLA_URL: http://valhalla:8002
+      PORT: 3000
+      HOST: 0.0.0.0
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./server/src:/workspace/server/src
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: undead-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  postgres-data:
+  valhalla-data:
