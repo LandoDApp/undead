@@ -1,5 +1,5 @@
 node_modules/
-dist/
+# dist/
 .env
 *.local
 
@@ -25,3 +25,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# 👇 WICHTIG
+!packages/shared/dist/
+!packages/shared/dist/**
