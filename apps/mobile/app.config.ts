@@ -33,6 +33,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     apiUrl: 'http://192.168.178.45:3000',
     mapTilerKey: 'tUNZqC9llORsnq4AEmu5',
+    eas: {
+      projectId: 'b9001eb8-405e-44a7-a0c2-2bc339fece57',
+    },
   },
 
   // 🔥 WICHTIG: verhindert MapLibre + Bridgeless Probleme
