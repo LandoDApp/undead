@@ -26,14 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-sensors',
     'expo-notifications',
     'expo-secure-store',
-    [
-      'expo-build-properties',
-      {
-        android: {
-          kotlinVersion: '1.9.25',
-        },
-      },
-    ],
+    ['./plugins/withKotlinVersion', '1.9.25'],
   ],
 
   scheme: 'undead',
