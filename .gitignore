@@ -5,7 +5,6 @@ node_modules/
 
 # Expo
 apps/mobile/.expo/
-apps/mobile/android/
 apps/mobile/ios/
 
 # Server
