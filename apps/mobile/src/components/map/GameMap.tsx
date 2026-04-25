@@ -7,6 +7,7 @@ let PlayerMarker: any = null;
 let ZombieMarkers: any = null;
 let SafeZoneLayer: any = null;
 let ZoneInfoModal: any = null;
+let CollectiblePointMarkers: any = null;
 
 try {
   MapLibreGL = require('@maplibre/maplibre-react-native').default;
@@ -14,6 +15,7 @@ try {
   ZombieMarkers = require('./ZombieMarkers').ZombieMarkers;
   SafeZoneLayer = require('../safe-zone/SafeZoneLayer').SafeZoneLayer;
   ZoneInfoModal = require('../safe-zone/ZoneInfoModal').ZoneInfoModal;
+  CollectiblePointMarkers = require('./CollectiblePointMarkers').CollectiblePointMarkers;
 } catch {
   // Expo Go fallback
 }
@@ -51,6 +53,9 @@ interface SelectedZone {
   charge: number;
   isFallen: boolean;
   radius: number;
+  maxCharge?: number;
+  upgradeLevel?: number;
+  baseRadius?: number;
 }
 
 export interface GameMapHandle {
@@ -104,6 +109,7 @@ export const GameMap = forwardRef<GameMapHandle>(function GameMap(_props, ref) {
         />
 
         <SafeZoneLayer onZonePress={handleZonePress} />
+        {CollectiblePointMarkers && <CollectiblePointMarkers />}
         <ZombieMarkers />
         <PlayerMarker />
       </MapLibreGL.MapView>

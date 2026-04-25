@@ -55,6 +55,9 @@ interface SafeZoneLayerProps {
     charge: number;
     isFallen: boolean;
     radius: number;
+    maxCharge?: number;
+    upgradeLevel?: number;
+    baseRadius?: number;
   }) => void;
 }
 
@@ -74,6 +77,9 @@ export function SafeZoneLayer({ onZonePress }: SafeZoneLayerProps) {
           charge: zone.charge,
           isFallen: zone.isFallen,
           radius: zone.radius,
+          maxCharge: zone.maxCharge,
+          upgradeLevel: zone.upgradeLevel,
+          baseRadius: zone.baseRadius,
         },
         geometry: {
           type: 'Polygon' as const,
@@ -98,7 +104,7 @@ export function SafeZoneLayer({ onZonePress }: SafeZoneLayerProps) {
           id: zone.id,
           name: zone.name,
           charge: zone.charge,
-          label: `${zone.name}\n${Math.round(zone.charge)}%`,
+          label: `${zone.name}\n${Math.round((zone.charge / (zone.maxCharge || 100)) * 100)}%`,
         },
         geometry: {
           type: 'Point' as const,
@@ -119,6 +125,9 @@ export function SafeZoneLayer({ onZonePress }: SafeZoneLayerProps) {
           charge: feature.properties.charge,
           isFallen: feature.properties.isFallen,
           radius: feature.properties.radius,
+          maxCharge: feature.properties.maxCharge,
+          upgradeLevel: feature.properties.upgradeLevel,
+          baseRadius: feature.properties.baseRadius,
         });
       }
     },

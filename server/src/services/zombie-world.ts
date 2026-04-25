@@ -11,38 +11,10 @@ import {
 } from '@undead/shared';
 import { pointAtDistance } from '@undead/shared';
 import type { Coordinate, ServerZombie } from '@undead/shared';
+import { gridCell, getCellsInRadius, cellCenter } from './grid-utils.js';
 
-const EARTH_RADIUS_M = 6_371_000;
-
-/** Compute grid cell key for a coordinate (~500m cells) */
-export function gridCell(lat: number, lon: number): string {
-  return `${Math.floor(lat * 200)}:${Math.floor(lon * 200)}`;
-}
-
-/** Get all grid cells within a bounding box around center */
-function getCellsInRadius(center: Coordinate, radiusM: number): string[] {
-  const dLat = (radiusM / EARTH_RADIUS_M) * (180 / Math.PI);
-  const dLon = dLat / Math.cos((center.latitude * Math.PI) / 180);
-
-  const minLat = center.latitude - dLat;
-  const maxLat = center.latitude + dLat;
-  const minLon = center.longitude - dLon;
-  const maxLon = center.longitude + dLon;
-
-  const cells: string[] = [];
-  const minCellLat = Math.floor(minLat * 200);
-  const maxCellLat = Math.floor(maxLat * 200);
-  const minCellLon = Math.floor(minLon * 200);
-  const maxCellLon = Math.floor(maxLon * 200);
-
-  for (let cLat = minCellLat; cLat <= maxCellLat; cLat++) {
-    for (let cLon = minCellLon; cLon <= maxCellLon; cLon++) {
-      cells.push(`${cLat}:${cLon}`);
-    }
-  }
-
-  return cells;
-}
+// Re-export for any external consumers
+export { gridCell };
 
 /** Revive zombies whose dead_until timer has expired */
 async function reviveExpiredZombies(cells: string[]): Promise<void> {
@@ -58,15 +30,6 @@ async function reviveExpiredZombies(cells: string[]): Promise<void> {
         lte(zombies.deadUntil, Date.now())
       )
     );
-}
-
-/** Get center coordinate of a grid cell */
-function cellCenter(cellKey: string): Coordinate {
-  const [latStr, lonStr] = cellKey.split(':');
-  return {
-    latitude: (parseInt(latStr) + 0.5) / 200,
-    longitude: (parseInt(lonStr) + 0.5) / 200,
-  };
 }
 
 /** Fill underpopulated cells with new zombies */

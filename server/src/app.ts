@@ -9,6 +9,8 @@ import { meetupRoutes } from './routes/meetup.js';
 import { friendRoutes } from './routes/friends.js';
 import { legalRoutes } from './routes/legal.js';
 import { devRoutes } from './routes/dev.js';
+import { pointRoutes } from './routes/points.js';
+import { startZoneTick } from './services/zone-tick.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -30,11 +32,16 @@ export async function buildApp() {
   await app.register(friendRoutes, { prefix: '/api/friends' });
   await app.register(legalRoutes, { prefix: '/api/legal' });
 
+  await app.register(pointRoutes, { prefix: '/api/points' });
+
   // Dev tools (no auth required)
   await app.register(devRoutes, { prefix: '/api/dev' });
 
   // Health check
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  // Start server-side zone tick loop
+  startZoneTick();
 
   return app;
 }

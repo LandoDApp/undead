@@ -62,6 +62,29 @@ export async function safeZoneRoutes(app: FastifyInstance) {
     return { success: true, data: { id } };
   });
 
+  // Heal a zone with points
+  app.post('/:id/heal', async (request) => {
+    const { id } = request.params as { id: string };
+    const body = z.object({ amount: z.number().int().min(1) }).parse(request.body);
+    try {
+      const result = await zoneService.healZone(request.user.id, id, body.amount);
+      return { success: true, data: result };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Upgrade a zone with points
+  app.post('/:id/upgrade', async (request) => {
+    const { id } = request.params as { id: string };
+    try {
+      const result = await zoneService.upgradeZone(request.user.id, id);
+      return { success: true, data: result };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
   // Get zone presence (who's nearby)
   app.get('/:id/presence', async (request) => {
     const { id } = request.params as { id: string };

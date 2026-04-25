@@ -19,6 +19,8 @@ export const safeZones = pgTable('safe_zones', {
   longitude: doublePrecision('longitude').notNull(),
   radius: real('radius').notNull().default(50),
   charge: integer('charge').notNull().default(100),
+  maxCharge: integer('max_charge').notNull().default(100),
+  upgradeLevel: integer('upgrade_level').notNull().default(0),
   isFallen: boolean('is_fallen').notNull().default(false),
   isApproved: boolean('is_approved').notNull().default(false),
   suggestedBy: text('suggested_by').references(() => users.id),
@@ -68,7 +70,32 @@ export const zoneChargeEvents = pgTable('zone_charge_events', {
     .notNull()
     .references(() => safeZones.id, { onDelete: 'cascade' }),
   delta: integer('delta').notNull(),
-  reason: text('reason').notNull(), // 'player_enter', 'player_stay', 'zombie_drain', 'reconquer'
+  reason: text('reason').notNull(), // 'player_enter', 'player_stay', 'zombie_drain', 'reconquer', 'tick_damage', 'tick_heal', 'player_heal', 'fallen'
   triggeredBy: text('triggered_by').references(() => users.id),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const collectiblePoints = pgTable('collectible_points', {
+  id: text('id').primaryKey(),
+  latitude: doublePrecision('latitude').notNull(),
+  longitude: doublePrecision('longitude').notNull(),
+  gridCell: text('grid_cell').notNull(),
+  value: integer('value').notNull().default(10),
+  expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+  collectedBy: text('collected_by').references(() => users.id),
+  collectedAt: timestamp('collected_at'),
+}, (table) => [
+  index('collectible_points_grid_cell_idx').on(table.gridCell),
+  index('collectible_points_lat_lon_idx').on(table.latitude, table.longitude),
+  index('collectible_points_expires_at_idx').on(table.expiresAt),
+]);
+
+export const playerPoints = pgTable('player_points', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  totalPoints: integer('total_points').notNull().default(0),
+  lifetimeEarned: integer('lifetime_earned').notNull().default(0),
+  lifetimeSpent: integer('lifetime_spent').notNull().default(0),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

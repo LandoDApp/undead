@@ -2,10 +2,41 @@ import { randomUUID } from 'crypto';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { safeZones, zoneVisits, zoneChargeEvents } from '../db/schema/game.js';
-import { ZONE_ENTER_CHARGE_BONUS, ZONE_MAX_CHARGE } from '@undead/shared';
+import {
+  ZONE_ENTER_CHARGE_BONUS,
+  ZONE_MAX_CHARGE,
+  ZONE_BASE_RADIUS,
+  ZONE_RADIUS_PER_LEVEL,
+  ZONE_MAX_LEVEL,
+  ZONE_UPGRADE_COSTS,
+  ZONE_SHRINK_THRESHOLD,
+  ZONE_SHRINK_FACTOR,
+  ZONE_HEAL_POINTS_PER_HP,
+} from '@undead/shared';
+import { spendPlayerPoints, getPlayerBalance } from './collectible-points.js';
+
+/** Compute effective radius considering upgrade level and charge */
+export function computeEffectiveRadius(zone: {
+  radius: number;
+  upgradeLevel: number;
+  charge: number;
+  maxCharge: number;
+}) {
+  const fullRadius = ZONE_BASE_RADIUS + zone.upgradeLevel * ZONE_RADIUS_PER_LEVEL;
+  const chargePercent = (zone.charge / zone.maxCharge) * 100;
+  if (chargePercent < ZONE_SHRINK_THRESHOLD) {
+    return Math.round(fullRadius * ZONE_SHRINK_FACTOR);
+  }
+  return fullRadius;
+}
 
 export async function getAllZones() {
-  return db.select().from(safeZones).where(eq(safeZones.isApproved, true));
+  const zones = await db.select().from(safeZones).where(eq(safeZones.isApproved, true));
+  return zones.map((zone) => ({
+    ...zone,
+    radius: computeEffectiveRadius(zone),
+    baseRadius: ZONE_BASE_RADIUS + zone.upgradeLevel * ZONE_RADIUS_PER_LEVEL,
+  }));
 }
 
 export async function getZoneById(id: string) {
@@ -95,6 +126,56 @@ export async function reconquerZone(userId: string, zoneId: string) {
   });
 
   return { ...zone, isFallen: false, charge: ZONE_ENTER_CHARGE_BONUS };
+}
+
+export async function healZone(userId: string, zoneId: string, amount: number) {
+  const zone = await getZoneById(zoneId);
+  if (!zone) throw new Error('Zone not found');
+  if (zone.isFallen) throw new Error('Cannot heal a fallen zone');
+
+  const hpToHeal = Math.min(amount, zone.maxCharge - zone.charge);
+  if (hpToHeal <= 0) throw new Error('Zone is already at full charge');
+
+  const pointsCost = hpToHeal * ZONE_HEAL_POINTS_PER_HP;
+  const newBalance = await spendPlayerPoints(userId, pointsCost);
+  if (newBalance === null) throw new Error('Not enough points');
+
+  const newCharge = zone.charge + hpToHeal;
+  await db.update(safeZones).set({ charge: newCharge }).where(eq(safeZones.id, zoneId));
+
+  await db.insert(zoneChargeEvents).values({
+    id: randomUUID(),
+    zoneId,
+    delta: hpToHeal,
+    reason: 'player_heal',
+    triggeredBy: userId,
+  });
+
+  return { newCharge, pointsSpent: pointsCost, newBalance };
+}
+
+export async function upgradeZone(userId: string, zoneId: string) {
+  const zone = await getZoneById(zoneId);
+  if (!zone) throw new Error('Zone not found');
+  if (zone.isFallen) throw new Error('Cannot upgrade a fallen zone');
+  if (zone.upgradeLevel >= ZONE_MAX_LEVEL) throw new Error('Zone is already at max level');
+
+  // Require 100% charge to upgrade
+  if (zone.charge < zone.maxCharge) throw new Error('Zone must be at full charge to upgrade');
+
+  const cost = ZONE_UPGRADE_COSTS[zone.upgradeLevel];
+  const newBalance = await spendPlayerPoints(userId, cost);
+  if (newBalance === null) throw new Error('Not enough points');
+
+  const newLevel = zone.upgradeLevel + 1;
+  const newRadius = ZONE_BASE_RADIUS + newLevel * ZONE_RADIUS_PER_LEVEL;
+
+  await db
+    .update(safeZones)
+    .set({ upgradeLevel: newLevel, radius: newRadius })
+    .where(eq(safeZones.id, zoneId));
+
+  return { newLevel, newRadius, pointsSpent: cost, newBalance };
 }
 
 export async function suggestZone(

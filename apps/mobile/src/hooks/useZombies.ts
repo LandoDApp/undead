@@ -14,8 +14,8 @@ import {
   ZOMBIE_ZONE_TARGET_RANGE,
   ZOMBIE_SYNC_INTERVAL,
 } from '@undead/shared';
-import { distanceMeters } from '@undead/shared';
-import type { ZombieState, ServerZombie } from '@undead/shared';
+import { distanceMeters, pointAtDistance } from '@undead/shared';
+import type { ZombieState, ServerZombie, Coordinate, SafeZone } from '@undead/shared';
 
 /** Convert server zombies to client ZombieState, preserving existing animated positions */
 function reconcileZombies(
@@ -48,6 +48,25 @@ function reconcileZombies(
 
   // Zombies only local (not on server) are dropped — dead or out of range
   return result;
+}
+
+/** Push a position out of any non-fallen zone, returning position on zone edge */
+function clampOutsideZones(pos: Coordinate, zones: SafeZone[]): { position: Coordinate; blocked: boolean } {
+  for (const zone of zones) {
+    if (zone.isFallen) continue;
+    const zoneCenter = { latitude: zone.latitude, longitude: zone.longitude };
+    const dist = distanceMeters(pos, zoneCenter);
+    if (dist < zone.radius) {
+      // Inside zone — push to edge
+      // Calculate bearing from zone center to zombie
+      const dLat = pos.latitude - zoneCenter.latitude;
+      const dLon = pos.longitude - zoneCenter.longitude;
+      const bearing = (Math.atan2(dLon * Math.cos(zoneCenter.latitude * Math.PI / 180), dLat) * 180) / Math.PI;
+      const edgePos = pointAtDistance(zoneCenter, zone.radius + 2, bearing);
+      return { position: edgePos, blocked: true };
+    }
+  }
+  return { position: pos, blocked: false };
 }
 
 export function useZombies() {
@@ -184,7 +203,14 @@ export function useZombies() {
               }
             }
 
-            z = { ...z, position: currentPos, routeIndex: idx };
+            // Zone boundary collision — stop zombie at zone edge
+            const clamped = clampOutsideZones(currentPos, zones);
+            if (clamped.blocked) {
+              // Zombie hit zone edge — stop route, stay at edge
+              z = { ...z, position: clamped.position, routePoints: [], routeIndex: 0 };
+            } else {
+              z = { ...z, position: currentPos, routeIndex: idx };
+            }
           }
 
           // Check if caught player
@@ -241,22 +267,24 @@ export function useZombies() {
             routeSlotAvailable &&
             z.routeIndex >= z.routePoints.length - 1
           ) {
-            let nearestZone: { latitude: number; longitude: number } | null = null;
+            let nearestZoneTarget: { latitude: number; longitude: number } | null = null;
             let nearestDist = ZOMBIE_ZONE_TARGET_RANGE;
 
             for (const zone of zones) {
               if (zone.isFallen) continue;
-              const zoneDist = distanceMeters(z.position, {
-                latitude: zone.latitude,
-                longitude: zone.longitude,
-              });
+              const zoneCenter = { latitude: zone.latitude, longitude: zone.longitude };
+              const zoneDist = distanceMeters(z.position, zoneCenter);
               if (zoneDist < nearestDist) {
                 nearestDist = zoneDist;
-                nearestZone = { latitude: zone.latitude, longitude: zone.longitude };
+                // Route to zone EDGE, not center — bearing from zone to zombie
+                const dLat = z.position.latitude - zoneCenter.latitude;
+                const dLon = z.position.longitude - zoneCenter.longitude;
+                const bearing = (Math.atan2(dLon * Math.cos(zoneCenter.latitude * Math.PI / 180), dLat) * 180) / Math.PI;
+                nearestZoneTarget = pointAtDistance(zoneCenter, zone.radius + 2, bearing);
               }
             }
 
-            if (nearestZone) {
+            if (nearestZoneTarget) {
               pendingRoutesRef.current++;
               z = { ...z, lastRouteUpdate: now };
               const zId = z.id;
@@ -265,8 +293,8 @@ export function useZombies() {
                 .getRoute({
                   zombieLat: z.position.latitude,
                   zombieLon: z.position.longitude,
-                  playerLat: nearestZone.latitude,
-                  playerLon: nearestZone.longitude,
+                  playerLat: nearestZoneTarget.latitude,
+                  playerLon: nearestZoneTarget.longitude,
                 })
                 .then((res) => {
                   pendingRoutesRef.current--;

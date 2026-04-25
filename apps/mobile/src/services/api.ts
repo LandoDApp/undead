@@ -14,6 +14,11 @@ import type {
   Friend,
   LegalPage,
   PlayerProfile,
+  CollectiblePointsNearbyResponse,
+  CollectPointResponse,
+  PlayerPointsBalance,
+  ZoneHealResponse,
+  ZoneUpgradeResponse,
 } from '@undead/shared';
 import { getToken } from './token-storage';
 
@@ -195,6 +200,31 @@ export const api = {
 
     getPresence: (id: string) =>
       request<SafeZonePresence>(`/api/zones/${id}/presence`),
+
+    heal: (id: string, amount: number) =>
+      request<ZoneHealResponse>(`/api/zones/${id}/heal`, {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
+
+    upgrade: (id: string) =>
+      request<ZoneUpgradeResponse>(`/api/zones/${id}/upgrade`, {
+        method: 'POST',
+      }),
+  },
+
+  points: {
+    nearby: (lat: number, lon: number) =>
+      request<CollectiblePointsNearbyResponse>(`/api/points/nearby?lat=${lat}&lon=${lon}`),
+
+    collect: (pointId: string, playerLat: number, playerLon: number) =>
+      request<CollectPointResponse>('/api/points/collect', {
+        method: 'POST',
+        body: JSON.stringify({ pointId, playerLat, playerLon }),
+      }),
+
+    getBalance: () =>
+      request<PlayerPointsBalance>('/api/points/balance'),
   },
 
   meetups: {

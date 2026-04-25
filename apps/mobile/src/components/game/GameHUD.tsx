@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useGameStore } from '@/stores/game';
 import { useLocationStore } from '@/stores/location';
 import { useZoneStore } from '@/stores/zone';
+import { usePointsStore } from '@/stores/points';
 import { PLAYER_MAX_HITS } from '@undead/shared';
 import { api } from '@/services/api';
 import { colors, spacing, fontSize, borderRadius } from '@/theme';
@@ -17,6 +18,7 @@ export function GameHUD({ mapRef }: GameHUDProps) {
     useGameStore();
   const motionState = useLocationStore((s) => s.motionState);
   const position = useLocationStore((s) => s.position);
+  const pointsBalance = usePointsStore((s) => s.balance.totalPoints);
 
   const timeLabel = {
     day: 'Tag',
@@ -159,6 +161,11 @@ export function GameHUD({ mapRef }: GameHUDProps) {
           <Text style={[styles.pillText, playerHits > 0 && styles.pillTextDanger]}>
             {heartsRemaining}/{PLAYER_MAX_HITS}
           </Text>
+        </View>
+
+        <View style={styles.pill}>
+          <View style={[styles.dot, { backgroundColor: colors.warning }]} />
+          <Text style={styles.pillText}>P {pointsBalance}</Text>
         </View>
       </View>
 

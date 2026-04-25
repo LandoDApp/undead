@@ -10,6 +10,7 @@ import { useDayNight } from '@/hooks/useDayNight';
 import { useSafeZone } from '@/hooks/useSafeZone';
 import { useSession } from '@/hooks/useSession';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useCollectiblePoints } from '@/hooks/useCollectiblePoints';
 import { colors } from '@/theme';
 
 export default function MapScreen() {
@@ -21,6 +22,7 @@ export default function MapScreen() {
   useSafeZone();
   useSession();
   usePushNotifications();
+  useCollectiblePoints();
 
   return (
     <View style={styles.container}>

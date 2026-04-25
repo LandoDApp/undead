@@ -21,6 +21,9 @@ export interface SafeZone {
   isFallen: boolean;
   isApproved: boolean;
   createdAt: string;
+  baseRadius: number;
+  maxCharge: number;
+  upgradeLevel: number;
 }
 
 export interface SafeZonePresence {

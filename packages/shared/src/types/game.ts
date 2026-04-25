@@ -100,3 +100,46 @@ export interface PlayerHealthState {
   isDown: boolean;
   downUntil: number | null;
 }
+
+// Collectible Points
+export interface CollectiblePoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  value: number;
+  expiresAt: number;
+}
+
+export interface CollectiblePointsNearbyResponse {
+  points: CollectiblePoint[];
+}
+
+export interface CollectPointResponse {
+  collected: boolean;
+  pointsEarned: number;
+  newBalance: number;
+}
+
+export interface PlayerPointsBalance {
+  totalPoints: number;
+  lifetimeEarned: number;
+  lifetimeSpent: number;
+}
+
+// Zone Healing & Upgrades
+export interface ZoneHealRequest {
+  amount: number;
+}
+
+export interface ZoneHealResponse {
+  newCharge: number;
+  pointsSpent: number;
+  newBalance: number;
+}
+
+export interface ZoneUpgradeResponse {
+  newLevel: number;
+  newRadius: number;
+  pointsSpent: number;
+  newBalance: number;
+}
