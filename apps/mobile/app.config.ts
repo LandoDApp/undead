@@ -26,16 +26,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-sensors',
     'expo-notifications',
     'expo-secure-store',
+    'expo-font',
     ['./plugins/withKotlinVersion', '1.9.25'],
   ],
 
   scheme: 'undead',
 
   extra: {
-    apiUrl: 'https://undead-dev-oheeke.loca.lt',
+    apiUrl: 'https://undead-server.loca.lt',
     mapTilerKey: 'tUNZqC9llORsnq4AEmu5',
     eas: {
-      projectId: 'b9001eb8-405e-44a7-a0c2-2bc339fece57',
+      projectId: 'b706dc2b-25ad-4809-9dfb-d4fcd6cf1935',
     },
   },
 

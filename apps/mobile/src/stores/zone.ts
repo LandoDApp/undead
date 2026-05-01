@@ -1,23 +1,23 @@
 import { create } from 'zustand';
-import type { SafeZone } from '@undead/shared';
+import type { CityState } from '@undead/shared';
 import { api } from '@/services/api';
 
-interface ZoneState {
-  zones: SafeZone[];
+interface CityStateStoreState {
+  cityStates: CityState[];
   isLoading: boolean;
-  fetchZones: () => Promise<void>;
+  fetchCityStates: () => Promise<void>;
 }
 
-export const useZoneStore = create<ZoneState>((set) => ({
-  zones: [],
+export const useCityStateStore = create<CityStateStoreState>((set) => ({
+  cityStates: [],
   isLoading: false,
 
-  fetchZones: async () => {
+  fetchCityStates: async () => {
     set({ isLoading: true });
     try {
-      const res = await api.zones.getAll();
+      const res = await api.cityStates.getAll();
       if (res.success && res.data) {
-        set({ zones: res.data as SafeZone[] });
+        set({ cityStates: res.data as CityState[] });
       }
     } finally {
       set({ isLoading: false });

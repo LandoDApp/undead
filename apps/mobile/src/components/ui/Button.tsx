@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, type ViewStyle } from 'react-native';
-import { colors, spacing, fontSize, borderRadius } from '@/theme';
+import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 
 interface ButtonProps {
   title: string;
@@ -34,7 +34,7 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? colors.primary : colors.text} />
+        <ActivityIndicator color={variant === 'outline' ? colors.gold : colors.text} />
       ) : (
         <Text style={textStyle}>{title}</Text>
       )}
@@ -50,6 +50,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.gold + '30',
   },
   primary: {
     backgroundColor: colors.primary,
@@ -60,7 +62,7 @@ const styles = StyleSheet.create({
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: colors.gold + '50',
   },
   disabled: {
     opacity: 0.5,
@@ -68,9 +70,10 @@ const styles = StyleSheet.create({
   text: {
     color: colors.text,
     fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
     fontWeight: '600',
   },
   outlineText: {
-    color: colors.primary,
+    color: colors.gold,
   },
 });

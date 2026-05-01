@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/theme';
+import { colors, fontFamily } from '@/theme';
 
 export default function GameLayout() {
   return (
@@ -9,10 +9,15 @@ export default function GameLayout() {
       screenOptions={{
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          borderTopColor: colors.gold + '30',
+          borderTopWidth: 1,
         },
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.gold,
         tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: {
+          fontFamily: fontFamily.body,
+          fontSize: 14,
+        },
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
         headerShown: false,
@@ -29,22 +34,12 @@ export default function GameLayout() {
         }}
       />
       <Tabs.Screen
-        name="zones"
+        name="bastion"
         options={{
-          title: 'Zonen',
-          tabBarLabel: 'Zonen',
+          title: 'Bastion',
+          tabBarLabel: 'Bastion',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shield-checkmark" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="social"
-        options={{
-          title: 'Social',
-          tabBarLabel: 'Social',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
+            <Ionicons name="shield" size={size} color={color} />
           ),
         }}
       />
@@ -56,6 +51,19 @@ export default function GameLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
+        }}
+      />
+      {/* Hidden from tab bar but still routable */}
+      <Tabs.Screen
+        name="zones"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

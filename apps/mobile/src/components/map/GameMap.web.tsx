@@ -6,7 +6,7 @@ import { colors, fontSize, spacing } from '@/theme';
 
 export function GameMap() {
   const position = useLocationStore((s) => s.position);
-  const { zombies, isInSafeZone, timeOfDay } = useGameStore();
+  const { ghouls, isInCityState, timeOfDay } = useGameStore();
 
   return (
     <View style={styles.container}>
@@ -17,10 +17,10 @@ export function GameMap() {
       <View style={styles.card}>
         <Text style={styles.label}>Zeit</Text>
         <Text style={styles.value}>{timeOfDay}</Text>
-        <Text style={styles.label}>Safe Zone</Text>
-        <Text style={styles.value}>{isInSafeZone ? 'Ja' : 'Nein'}</Text>
-        <Text style={styles.label}>Zombies</Text>
-        <Text style={styles.value}>{zombies.length}</Text>
+        <Text style={styles.label}>Stadtstaat</Text>
+        <Text style={styles.value}>{isInCityState ? 'Ja' : 'Nein'}</Text>
+        <Text style={styles.label}>Ghoule</Text>
+        <Text style={styles.value}>{ghouls.length}</Text>
         <Text style={styles.label}>Position</Text>
         <Text style={styles.value}>
           {position

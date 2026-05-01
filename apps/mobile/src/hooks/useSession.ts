@@ -5,19 +5,18 @@ import { useGameStore } from '@/stores/game';
 import { useLocationStore } from '@/stores/location';
 import { api } from '@/services/api';
 import { SESSION_RESUME_THRESHOLD } from '@undead/shared';
-import type { ZombieState } from '@undead/shared';
+import type { GhoulState } from '@undead/shared';
 
 const SESSION_KEY = 'undead_session_state';
 
 interface SavedSession {
-  zombies: ZombieState[];
+  ghouls: GhoulState[];
   timestamp: number;
   position: { latitude: number; longitude: number } | null;
 }
 
 export function useSession() {
-  const { startSession, resetSession, setZombies, pauseSession, resumeSession } =
-    useGameStore();
+  const { setGhouls } = useGameStore();
   const appStateRef = useRef(AppState.currentState);
   const transitionRef = useRef(false);
 
@@ -25,13 +24,8 @@ export function useSession() {
     let mounted = true;
     // Try to restore session on mount
     (async () => {
-      const restored = await restoreSession();
       if (!mounted) return;
-      if (restored) {
-        resumeSession();
-      } else {
-        startSession();
-      }
+      await restoreSession();
     })();
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -48,19 +42,14 @@ export function useSession() {
     if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
       // Going to background - save state
       await saveSession();
-      pauseSession();
       try {
         await api.player.setInactive();
       } catch {
-        // network failures are ignored; local pause state is authoritative
+        // network failures are ignored
       }
     } else if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-      // Coming back to foreground
-      const restored = await restoreSession();
-      if (!restored) {
-        startSession();
-      }
-      resumeSession();
+      // Coming back to foreground — restore or clear stale ghouls
+      await restoreSession();
     }
     appStateRef.current = nextState;
     transitionRef.current = false;
@@ -68,7 +57,7 @@ export function useSession() {
 
   async function saveSession() {
     const state: SavedSession = {
-      zombies: useGameStore.getState().zombies,
+      ghouls: useGameStore.getState().ghouls,
       timestamp: Date.now(),
       position: useLocationStore.getState().position,
     };
@@ -84,13 +73,13 @@ export function useSession() {
       const elapsed = Date.now() - state.timestamp;
 
       if (elapsed > SESSION_RESUME_THRESHOLD) {
-        // Too long - fresh reset
-        resetSession();
+        // Too long — clear stale ghouls
+        setGhouls([]);
         await AsyncStorage.removeItem(SESSION_KEY);
         return false;
-      } else if (state.zombies.length > 0) {
-        // Resume with extrapolated zombies
-        setZombies(state.zombies);
+      } else if (state.ghouls.length > 0) {
+        // Resume with saved ghouls
+        setGhouls(state.ghouls);
         return true;
       }
       return true;

@@ -2,13 +2,23 @@ import React, { useMemo } from 'react';
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { usePointsStore } from '@/stores/points';
 
-// Amber/gold color for collectible points
+// Glow layer — flat on the ground
+const glowStyle = {
+  circleRadius: 18,
+  circleColor: '#f59e0b',
+  circleOpacity: 0.18,
+  circleBlur: 1,
+  circlePitchAlignment: 'map' as const,
+} as const;
+
+// Amber/gold collectible points — flat on the ground for 3D effect
 const circleStyle = {
-  circleRadius: 5,
+  circleRadius: 11,
   circleColor: '#f59e0b',
   circleOpacity: 0.9,
   circleStrokeWidth: 2,
-  circleStrokeColor: 'rgba(245, 158, 11, 0.3)',
+  circleStrokeColor: 'rgba(245, 158, 11, 0.35)',
+  circlePitchAlignment: 'map' as const,
 } as const;
 
 export function CollectiblePointMarkers() {
@@ -34,6 +44,7 @@ export function CollectiblePointMarkers() {
 
   return (
     <MapLibreGL.ShapeSource id="collectible-points" shape={geojson}>
+      <MapLibreGL.CircleLayer id="collectible-point-glow" style={glowStyle} />
       <MapLibreGL.CircleLayer id="collectible-point-circles" style={circleStyle} />
     </MapLibreGL.ShapeSource>
   );

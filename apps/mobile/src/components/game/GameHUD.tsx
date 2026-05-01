@@ -1,24 +1,25 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { useGameStore } from '@/stores/game';
 import { useLocationStore } from '@/stores/location';
-import { useZoneStore } from '@/stores/zone';
-import { usePointsStore } from '@/stores/points';
+import { useResourceStore } from '@/stores/resources';
+import { useDailyStore } from '@/stores/daily';
 import { PLAYER_MAX_HITS } from '@undead/shared';
-import { api } from '@/services/api';
-import { colors, spacing, fontSize, borderRadius } from '@/theme';
+import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
+import { icons } from '@/assets';
 import type { GameMapHandle } from '@/components/map/GameMap';
+import { QuestTracker } from '@/components/game/QuestTracker';
 
 interface GameHUDProps {
   mapRef: React.RefObject<GameMapHandle | null>;
 }
 
 export function GameHUD({ mapRef }: GameHUDProps) {
-  const { zombies, timeOfDay, isGameActive, isInSafeZone, isPaused, playerHits } =
+  const { ghouls, timeOfDay, isInCityState, playerHits, gameMode, isExitingJagd, exitJagdCountdown } =
     useGameStore();
   const motionState = useLocationStore((s) => s.motionState);
-  const position = useLocationStore((s) => s.position);
-  const pointsBalance = usePointsStore((s) => s.balance.totalPoints);
+  const balance = useResourceStore((s) => s.balance);
+  const streak = useDailyStore((s) => s.streak);
 
   const timeLabel = {
     day: 'Tag',
@@ -32,12 +33,9 @@ export function GameHUD({ mapRef }: GameHUDProps) {
     running: 'Laufen',
   }[motionState];
 
-  const activeZombies = zombies.filter((z) => !z.frozen).length;
+  const activeGhouls = ghouls.filter((g) => !g.frozen).length;
   const heartsRemaining = PLAYER_MAX_HITS - playerHits;
-
-  const handleStartGame = () => {
-    useGameStore.getState().startGame();
-  };
+  const isJagd = gameMode === 'jagd';
 
   const handleCenterOnPlayer = () => {
     const pos = useLocationStore.getState().position;
@@ -46,83 +44,29 @@ export function GameHUD({ mapRef }: GameHUDProps) {
     }
   };
 
-  const handleReset = () => {
-    Alert.alert(
-      'Spiel beenden',
-      'Zombies löschen und Safe Zones zurücksetzen?',
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        {
-          text: 'Beenden',
-          style: 'destructive',
-          onPress: () => {
-            api.dev.reset().then((res) => {
-              if (res.success) {
-                useGameStore.getState().stopGame();
-                useZoneStore.getState().fetchZones();
-              }
-            });
-          },
-        },
-      ]
-    );
+  const handleJagdToggle = () => {
+    if (isExitingJagd) return;
+    if (isJagd) {
+      useGameStore.getState().exitJagd();
+    } else {
+      useGameStore.getState().enterJagd();
+    }
   };
 
-  // Before game starts: show start screen
-  if (!isGameActive) {
-    return (
-      <View style={styles.overlay} pointerEvents="box-none">
-        {/* Top info pills */}
-        <View style={styles.topBar} pointerEvents="none">
-          <View style={styles.pill}>
-            <View
-              style={[
-                styles.dot,
-                {
-                  backgroundColor:
-                    timeOfDay === 'day'
-                      ? colors.warning
-                      : timeOfDay === 'night'
-                      ? colors.primary
-                      : colors.textMuted,
-                },
-              ]}
-            />
-            <Text style={styles.pillText}>{timeLabel}</Text>
-          </View>
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>{motionLabel}</Text>
-          </View>
-        </View>
+  const renderHearts = () => {
+    const hearts = [];
+    for (let i = 0; i < PLAYER_MAX_HITS; i++) {
+      hearts.push(
+        <Image
+          key={i}
+          source={icons.heart}
+          style={[styles.iconSmall, i >= heartsRemaining && styles.iconDimmed]}
+        />
+      );
+    }
+    return hearts;
+  };
 
-        {/* Center: start button */}
-        <View style={styles.startContainer} pointerEvents="box-none">
-          <Text style={styles.startHint}>
-            {position
-              ? 'Geh dahin wo du spielen willst'
-              : 'Warte auf GPS...'}
-          </Text>
-          <TouchableOpacity
-            style={[styles.startButton, !position && styles.startButtonDisabled]}
-            onPress={handleStartGame}
-            activeOpacity={0.7}
-            disabled={!position}
-          >
-            <Text style={styles.startButtonText}>Spiel starten</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom right: center button */}
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleCenterOnPlayer} activeOpacity={0.7}>
-            <Text style={styles.actionButtonIcon}>📍</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Game is active: show full HUD
   return (
     <View style={styles.overlay} pointerEvents="box-none">
       {/* Top status bar */}
@@ -148,53 +92,99 @@ export function GameHUD({ mapRef }: GameHUDProps) {
           <Text style={styles.pillText}>{motionLabel}</Text>
         </View>
 
-        <View style={styles.pill}>
-          <View style={[styles.dot, { backgroundColor: colors.zombie }]} />
-          <Text style={styles.pillText}>{activeZombies}</Text>
-        </View>
+        {isJagd && (
+          <View style={styles.pill}>
+            <View style={[styles.dot, { backgroundColor: colors.ghoul }]} />
+            <Text style={styles.pillText}>{activeGhouls}</Text>
+          </View>
+        )}
 
         <View style={[styles.pill, playerHits > 0 && styles.pillDanger]}>
-          <Text style={styles.healthHearts}>
-            {'❤️'.repeat(heartsRemaining)}
-            {'🖤'.repeat(playerHits)}
-          </Text>
+          {renderHearts()}
           <Text style={[styles.pillText, playerHits > 0 && styles.pillTextDanger]}>
             {heartsRemaining}/{PLAYER_MAX_HITS}
           </Text>
         </View>
 
         <View style={styles.pill}>
-          <View style={[styles.dot, { backgroundColor: colors.warning }]} />
-          <Text style={styles.pillText}>P {pointsBalance}</Text>
+          <Image source={icons.herb} style={styles.iconSmall} />
+          <Text style={styles.pillText}>{balance.herbs}</Text>
         </View>
+
+        <View style={styles.pill}>
+          <Image source={icons.crystal} style={styles.iconSmall} />
+          <Text style={styles.pillText}>{balance.crystals}</Text>
+        </View>
+
+        {balance.relics > 0 && (
+          <View style={styles.pill}>
+            <Image source={icons.relic} style={styles.iconSmall} />
+            <Text style={styles.pillText}>{balance.relics}</Text>
+          </View>
+        )}
+
+        {streak && streak.currentStreak > 0 && (
+          <View style={styles.pill}>
+            <Image source={icons.streak} style={styles.iconSmall} />
+            <Text style={styles.pillText}>{streak.currentStreak}</Text>
+          </View>
+        )}
       </View>
 
       {/* Banners */}
-      {isInSafeZone && (
-        <View style={styles.safeZoneBanner} pointerEvents="none">
-          <Text style={styles.safeZoneText}>Safe Zone - Zombies eingefroren</Text>
+      {isInCityState && (
+        <View style={styles.cityStateBanner} pointerEvents="none">
+          <Image source={icons.shield} style={styles.iconSmall} />
+          <Text style={styles.cityStateText}>Stadtstaat {'\u2014'} Ghoule gebannt</Text>
         </View>
       )}
 
       {timeOfDay === 'blackout' && (
         <View style={styles.blackoutBanner} pointerEvents="none">
-          <Text style={styles.blackoutText}>Ruhezeit (23:00 - 06:00) - Keine Zombies</Text>
+          <Text style={styles.blackoutText}>Ruhezeit (23:00 - 06:00) {'\u2014'} Keine Ghoule</Text>
         </View>
       )}
 
-      {isPaused && (
-        <View style={styles.pausedBanner} pointerEvents="none">
-          <Text style={styles.pausedText}>Session pausiert</Text>
-        </View>
-      )}
+      {/* Quest Tracker */}
+      <QuestTracker />
 
       {/* Bottom action buttons */}
       <View style={styles.bottomButtons}>
         <TouchableOpacity style={styles.actionButton} onPress={handleCenterOnPlayer} activeOpacity={0.7}>
-          <Text style={styles.actionButtonIcon}>📍</Text>
+          <Image source={icons.shield} style={styles.iconMed} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.resetButton]} onPress={handleReset} activeOpacity={0.7}>
-          <Text style={styles.actionButtonIcon}>🔄</Text>
+
+        {/* Jagd / Fliehen button */}
+        <TouchableOpacity
+          style={[
+            styles.jagdButton,
+            isJagd && styles.jagdButtonActive,
+            isExitingJagd && styles.jagdButtonExiting,
+          ]}
+          onPress={handleJagdToggle}
+          activeOpacity={0.7}
+          disabled={isExitingJagd}
+        >
+          {isExitingJagd ? (
+            <View style={styles.jagdExitContent}>
+              <Text style={styles.jagdExitText}>Du entkommst...</Text>
+              <View style={styles.jagdExitBarBg}>
+                <View
+                  style={[
+                    styles.jagdExitBarFill,
+                    { width: `${((3 - exitJagdCountdown) / 3) * 100}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.jagdButtonRow}>
+              <Image source={isJagd ? icons.flee : icons.sword} style={styles.iconSmall} />
+              <Text style={styles.jagdButtonText}>
+                {isJagd ? 'Fliehen' : 'Jagd'}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -213,6 +203,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     paddingTop: spacing.xxl + spacing.md,
     paddingHorizontal: spacing.md,
@@ -220,10 +211,12 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface + 'E0',
+    backgroundColor: colors.parchment + 'E0',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.gold + '30',
     gap: spacing.xs,
   },
   pillDanger: {
@@ -232,72 +225,49 @@ const styles = StyleSheet.create({
   },
   pillText: {
     color: colors.text,
-    fontSize: fontSize.sm,
-    fontWeight: '500',
+    fontSize: 14,
+    fontFamily: fontFamily.body,
   },
   pillTextDanger: {
     color: colors.danger,
-  },
-  healthHearts: {
-    fontSize: 12,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  // Start screen
-  startContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.md,
+  iconSmall: {
+    width: 16,
+    height: 16,
   },
-  startHint: {
-    color: colors.text,
-    fontSize: fontSize.md,
-    fontWeight: '500',
-    backgroundColor: colors.surface + 'E0',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
+  iconDimmed: {
+    opacity: 0.25,
   },
-  startButton: {
-    backgroundColor: colors.danger,
-    paddingHorizontal: spacing.xxl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-  },
-  startButtonDisabled: {
-    opacity: 0.4,
-  },
-  startButtonText: {
-    color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+  iconMed: {
+    width: 24,
+    height: 24,
   },
   // Banners
-  safeZoneBanner: {
+  cityStateBanner: {
     position: 'absolute',
     top: spacing.xxl + spacing.md + 48,
     left: spacing.lg,
     right: spacing.lg,
-    backgroundColor: colors.safeZone + '20',
+    backgroundColor: colors.cityState + '20',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: colors.safeZone,
+    borderColor: colors.cityState,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  safeZoneText: {
-    color: colors.safeZone,
-    fontSize: fontSize.sm,
+  cityStateText: {
+    color: colors.cityState,
+    fontSize: 14,
+    fontFamily: fontFamily.body,
     fontWeight: '600',
   },
   blackoutBanner: {
@@ -313,25 +283,8 @@ const styles = StyleSheet.create({
   },
   blackoutText: {
     color: colors.textSecondary,
-    fontSize: fontSize.sm,
-  },
-  pausedBanner: {
-    position: 'absolute',
-    top: spacing.xxl + spacing.md + 48,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.warning + '22',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    alignItems: 'center',
-  },
-  pausedText: {
-    color: colors.warning,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
+    fontSize: 14,
+    fontFamily: fontFamily.body,
   },
   // Bottom buttons
   bottomButtons: {
@@ -339,21 +292,66 @@ const styles = StyleSheet.create({
     bottom: spacing.xxl + spacing.md,
     right: spacing.md,
     gap: spacing.sm,
+    alignItems: 'flex-end',
   },
   actionButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surface + 'E0',
+    backgroundColor: colors.parchment + 'E0',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.gold + '30',
   },
-  resetButton: {
-    borderColor: colors.danger + '60',
+  jagdButton: {
+    backgroundColor: colors.danger,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.gold + '40',
+    minWidth: 100,
+    alignItems: 'center',
   },
-  actionButtonIcon: {
-    fontSize: 20,
+  jagdButtonActive: {
+    backgroundColor: colors.warning,
+  },
+  jagdButtonExiting: {
+    backgroundColor: colors.surfaceLight,
+    opacity: 0.9,
+  },
+  jagdButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  jagdButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+  },
+  jagdExitContent: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    minWidth: 120,
+  },
+  jagdExitText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontFamily: fontFamily.body,
+  },
+  jagdExitBarBg: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.background,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  jagdExitBarFill: {
+    height: '100%',
+    backgroundColor: colors.warning,
+    borderRadius: 2,
   },
 });

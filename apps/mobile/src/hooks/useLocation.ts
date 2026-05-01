@@ -14,13 +14,17 @@ import {
 import type { MotionState } from '@undead/shared';
 
 export function useLocation() {
-  const { setPosition, setMotionState, setTracking, motionState } = useLocationStore();
+  // Individual selectors — only re-render when motionState changes, not on every position/displayPosition update
+  const motionState = useLocationStore((s) => s.motionState);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const samplesRef = useRef<number[]>([]);
 
   useEffect(() => {
-    let subscription: Location.LocationSubscription | null = null;
     let accelSubscription: { remove: () => void } | null = null;
+
+    // Grab stable action references once (never change)
+    const { setPosition, setMotionState, setTracking } =
+      useLocationStore.getState();
 
     async function start() {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -58,10 +62,9 @@ export function useLocation() {
     start();
 
     return () => {
-      subscription?.remove();
       accelSubscription?.remove();
       if (intervalRef.current) clearInterval(intervalRef.current);
-      setTracking(false);
+      useLocationStore.getState().setTracking(false);
     };
   }, []);
 
@@ -87,29 +90,29 @@ export function useLocation() {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [motionState]);
+}
 
-  async function pollPosition() {
-    try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+async function pollPosition() {
+  try {
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
 
-      const coord = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
+    const coord = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
 
-      setPosition(coord, location.coords.accuracy ?? 0);
+    useLocationStore.getState().setPosition(coord, location.coords.accuracy ?? 0);
 
-      // Send to server
-      api.player.updatePosition({
-        latitude: coord.latitude,
-        longitude: coord.longitude,
-        accuracy: location.coords.accuracy ?? 0,
-      });
-    } catch {
-      // GPS unavailable
-    }
+    // Send to server
+    api.player.updatePosition({
+      latitude: coord.latitude,
+      longitude: coord.longitude,
+      accuracy: location.coords.accuracy ?? 0,
+    });
+  } catch {
+    // GPS unavailable
   }
 }
 

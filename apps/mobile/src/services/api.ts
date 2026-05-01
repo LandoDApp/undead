@@ -1,15 +1,15 @@
 import Constants from 'expo-constants';
 import type {
   ApiResponse,
-  ZombieNearbyResponse,
-  ZombieRouteResponse,
-  ZombieRouteRequest,
-  ZombieCatchRequest,
-  ZombieCatchResponse,
+  GhoulNearbyResponse,
+  GhoulRouteResponse,
+  GhoulRouteRequest,
+  GhoulCatchRequest,
+  GhoulCatchResponse,
   PlayerPositionUpdate,
   PlayerHealthState,
-  SafeZone,
-  SafeZonePresence,
+  CityState,
+  CityStatePresence,
   Meetup,
   Friend,
   LegalPage,
@@ -17,25 +17,40 @@ import type {
   CollectiblePointsNearbyResponse,
   CollectPointResponse,
   PlayerPointsBalance,
+  ResourcesNearbyResponse,
+  CollectResourceResponse,
+  ResourceBalance,
   ZoneHealResponse,
   ZoneUpgradeResponse,
+  Bastion,
+  BastionHealResponse,
+  BastionUpgradeResponse,
+  BastionReinforceResponse,
+  BastionNearbyResponse,
+  BastionIdleState,
+  BastionCollectResponse,
+  BastionWorker,
+  BastionWorkerUpgradeResponse,
+  WorkerType,
+  Quest,
+  QuestListResponse,
+  QuestClaimResponse,
+  DailyStreak,
+  DailyVision,
+  ClanType,
 } from '@undead/shared';
 import { getToken } from './token-storage';
 
 /**
- * 👉 WICHTIG:
- * Verwende IMMER deine echte LAN-IP im Development.
- * Alles andere (localhost, debuggerHost) ist in deinem Setup fehleranfällig.
+ * In __DEV__ (npx expo run:android) → lokale LAN-IP, kein Tunnel nötig.
+ * In Production → Tunnel-/Cloud-URL aus app.config.ts extra.apiUrl.
  */
 function getApiUrl(): string {
-  const envUrl = Constants.expoConfig?.extra?.apiUrl;
-
-  if (envUrl && envUrl !== 'http://localhost:3000') {
-    return envUrl;
+  if (__DEV__) {
+    return 'http://192.168.178.45:3000';
   }
 
-  // Fallback: stabile lokale Netzwerk-IP (dein PC im WLAN)
-  return 'http://192.168.178.45:3000';
+  return Constants.expoConfig?.extra?.apiUrl ?? 'http://192.168.178.45:3000';
 }
 
 const API_URL = getApiUrl();
@@ -148,43 +163,52 @@ export const api = {
       request<PlayerHealthState>('/api/player/revive', {
         method: 'POST',
       }),
+
+    getClan: () =>
+      request<{ clan: ClanType | null }>('/api/player/clan'),
+
+    setClan: (clan: ClanType) =>
+      request<{ clan: ClanType }>('/api/player/clan', {
+        method: 'POST',
+        body: JSON.stringify({ clan }),
+      }),
   },
 
-  zombies: {
+  ghouls: {
     nearby: (lat: number, lon: number) =>
-      request<ZombieNearbyResponse>(`/api/zombies/nearby?lat=${lat}&lon=${lon}`),
+      request<GhoulNearbyResponse>(`/api/ghouls/nearby?lat=${lat}&lon=${lon}`),
 
-    getRoute: (data: ZombieRouteRequest) =>
-      request<ZombieRouteResponse>('/api/zombies/route', {
+    getRoute: (data: GhoulRouteRequest) =>
+      request<GhoulRouteResponse>('/api/ghouls/route', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
-    catch: (data: ZombieCatchRequest) =>
-      request<ZombieCatchResponse>('/api/zombies/catch', {
+    catch: (data: GhoulCatchRequest) =>
+      request<GhoulCatchResponse>('/api/ghouls/catch', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
   },
 
-  zones: {
-    getAll: () => request<SafeZone[]>('/api/zones'),
+  cityStates: {
+    getAll: () => request<CityState[]>('/api/city-states'),
 
     getById: (id: string) =>
-      request<SafeZone>(`/api/zones/${id}`),
+      request<CityState>(`/api/city-states/${id}`),
 
     enter: (id: string) =>
-      request(`/api/zones/${id}/enter`, {
+      request(`/api/city-states/${id}/enter`, {
         method: 'POST',
       }),
 
     exit: (id: string) =>
-      request(`/api/zones/${id}/exit`, {
+      request(`/api/city-states/${id}/exit`, {
         method: 'POST',
       }),
 
     reconquer: (id: string) =>
-      request(`/api/zones/${id}/reconquer`, {
+      request(`/api/city-states/${id}/reconquer`, {
         method: 'POST',
       }),
 
@@ -194,26 +218,41 @@ export const api = {
       longitude: number;
       radius: number;
     }) =>
-      request('/api/zones/suggest', {
+      request('/api/city-states/suggest', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
 
     getPresence: (id: string) =>
-      request<SafeZonePresence>(`/api/zones/${id}/presence`),
+      request<CityStatePresence>(`/api/city-states/${id}/presence`),
 
     heal: (id: string, amount: number) =>
-      request<ZoneHealResponse>(`/api/zones/${id}/heal`, {
+      request<ZoneHealResponse>(`/api/city-states/${id}/heal`, {
         method: 'POST',
         body: JSON.stringify({ amount }),
       }),
 
     upgrade: (id: string) =>
-      request<ZoneUpgradeResponse>(`/api/zones/${id}/upgrade`, {
+      request<ZoneUpgradeResponse>(`/api/city-states/${id}/upgrade`, {
         method: 'POST',
       }),
   },
 
+  resources: {
+    nearby: (lat: number, lon: number) =>
+      request<ResourcesNearbyResponse>(`/api/resources/nearby?lat=${lat}&lon=${lon}`),
+
+    collect: (resourceId: string, playerLat: number, playerLon: number) =>
+      request<CollectResourceResponse>('/api/resources/collect', {
+        method: 'POST',
+        body: JSON.stringify({ resourceId, playerLat, playerLon }),
+      }),
+
+    getBalance: () =>
+      request<ResourceBalance>('/api/resources/balance'),
+  },
+
+  /** @deprecated Use resources instead */
   points: {
     nearby: (lat: number, lon: number) =>
       request<CollectiblePointsNearbyResponse>(`/api/points/nearby?lat=${lat}&lon=${lon}`),
@@ -282,6 +321,98 @@ export const api = {
     remove: (friendId: string) =>
       request(`/api/friends/${friendId}`, {
         method: 'DELETE',
+      }),
+  },
+
+  bastion: {
+    get: () =>
+      request<Bastion>('/api/bastion'),
+
+    create: (data: { name: string; latitude: number; longitude: number }) =>
+      request<Bastion>('/api/bastion', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    upgrade: () =>
+      request<{ bastion: Bastion; crystalsSpent: number; newBalance: ResourceBalance }>('/api/bastion/upgrade', {
+        method: 'POST',
+      }),
+
+    heal: (amount: number) =>
+      request<BastionHealResponse>('/api/bastion/heal', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
+
+    reinforce: (bastionId: string) =>
+      request<BastionReinforceResponse>(`/api/bastion/${bastionId}/reinforce`, {
+        method: 'POST',
+      }),
+
+    nearby: (lat: number, lon: number) =>
+      request<BastionNearbyResponse>(`/api/bastion/nearby?lat=${lat}&lon=${lon}`),
+
+    getIdleState: () =>
+      request<BastionIdleState>('/api/bastion/idle'),
+
+    collect: () =>
+      request<BastionCollectResponse>('/api/bastion/collect', {
+        method: 'POST',
+      }),
+
+    assignWorker: (workerType: WorkerType) =>
+      request<BastionWorker>('/api/bastion/workers', {
+        method: 'POST',
+        body: JSON.stringify({ workerType }),
+      }),
+
+    removeWorker: (workerId: string) =>
+      request(`/api/bastion/workers/${workerId}`, {
+        method: 'DELETE',
+      }),
+
+    upgradeWorker: (workerId: string) =>
+      request<BastionWorkerUpgradeResponse>(`/api/bastion/workers/${workerId}/upgrade`, {
+        method: 'POST',
+      }),
+  },
+
+  quests: {
+    getAll: () =>
+      request<QuestListResponse>('/api/quests'),
+
+    claim: (questId: string) =>
+      request<QuestClaimResponse>(`/api/quests/${questId}/claim`, {
+        method: 'POST',
+      }),
+  },
+
+  streak: {
+    get: () =>
+      request<DailyStreak>('/api/player/streak'),
+
+    useFreeze: () =>
+      request<DailyStreak>('/api/player/streak/freeze', {
+        method: 'POST',
+      }),
+  },
+
+  vision: {
+    get: () =>
+      request<DailyVision>('/api/player/vision'),
+
+    draw: () =>
+      request<DailyVision>('/api/player/vision/draw', {
+        method: 'POST',
+      }),
+  },
+
+  steps: {
+    report: (steps: number) =>
+      request('/api/player/steps', {
+        method: 'POST',
+        body: JSON.stringify({ steps }),
       }),
   },
 

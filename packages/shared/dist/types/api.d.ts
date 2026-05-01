@@ -9,7 +9,7 @@ export interface PaginatedResponse<T> {
     page: number;
     pageSize: number;
 }
-export interface SafeZone {
+export interface CityState {
     id: string;
     name: string;
     latitude: number;
@@ -23,7 +23,9 @@ export interface SafeZone {
     maxCharge: number;
     upgradeLevel: number;
 }
-export interface SafeZonePresence {
+/** @deprecated Use CityState instead */
+export type SafeZone = CityState;
+export interface CityStatePresence {
     zoneId: string;
     players: Array<{
         displayName: string;
@@ -31,6 +33,8 @@ export interface SafeZonePresence {
     }>;
     currentCount: number;
 }
+/** @deprecated Use CityStatePresence instead */
+export type SafeZonePresence = CityStatePresence;
 export interface ZoneVisitEvent {
     type: 'enter' | 'exit';
     zoneId: string;

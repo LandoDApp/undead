@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import type { SafeZone } from '@undead/shared';
-import { colors, spacing, fontSize, borderRadius } from '@/theme';
+import type { CityState } from '@undead/shared';
+import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 
-interface SafeZoneCardProps {
-  zone: SafeZone;
+interface CityStateCardProps {
+  zone: CityState;
 }
 
-export function SafeZoneCard({ zone }: SafeZoneCardProps) {
+export function SafeZoneCard({ zone }: CityStateCardProps) {
   const chargeColor = zone.isFallen
     ? colors.danger
     : zone.charge > 50
@@ -39,10 +39,12 @@ export function SafeZoneCard({ zone }: SafeZoneCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.parchment,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.gold + '30',
   },
   header: {
     flexDirection: 'row',
@@ -52,6 +54,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
     fontWeight: '600',
     color: colors.text,
     flex: 1,
@@ -63,6 +66,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: fontSize.xs,
+    fontFamily: fontFamily.body,
     fontWeight: '600',
   },
   chargeBar: {
@@ -77,6 +81,7 @@ const styles = StyleSheet.create({
   },
   radius: {
     fontSize: fontSize.xs,
+    fontFamily: fontFamily.body,
     color: colors.textMuted,
   },
 });

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { playerHealthState, playerPositions } from '../db/schema/game.js';
-import { PLAYER_MAX_HITS, PLAYER_DOWN_DURATION, ZOMBIE_CAUGHT_DISTANCE } from '@undead/shared';
+import { PLAYER_MAX_HITS, PLAYER_DOWN_DURATION, GHOUL_CAUGHT_DISTANCE } from '@undead/shared';
 import { distanceMeters } from '@undead/shared';
 import type { PlayerHealthState } from '@undead/shared';
 
@@ -42,21 +42,21 @@ export async function getHealthState(userId: string): Promise<PlayerHealthState>
   };
 }
 
-/** Validate a zombie catch and apply damage */
-export async function processZombieCatch(
+/** Validate a ghoul catch and apply damage */
+export async function processGhoulCatch(
   userId: string,
-  zombieLat: number,
-  zombieLon: number,
+  ghoulLat: number,
+  ghoulLon: number,
   playerLat: number,
   playerLon: number
 ): Promise<{ hit: boolean; totalHits: number; isDown: boolean; downUntil: number | null }> {
   // Validate distance - server-side check with some tolerance (2x caught distance)
   const dist = distanceMeters(
-    { latitude: zombieLat, longitude: zombieLon },
+    { latitude: ghoulLat, longitude: ghoulLon },
     { latitude: playerLat, longitude: playerLon }
   );
 
-  if (dist > ZOMBIE_CAUGHT_DISTANCE * 2) {
+  if (dist > GHOUL_CAUGHT_DISTANCE * 2) {
     // Too far apart - reject
     return { hit: false, totalHits: 0, isDown: false, downUntil: null };
   }
@@ -96,6 +96,9 @@ export async function processZombieCatch(
         updatedAt: new Date(),
       },
     });
+
+  // Quest progress: count as ghoul defeat when player is downed (took the hit)
+  import('./quests.js').then((m) => m.incrementQuestProgress(userId, 'defeat', 1)).catch(() => {});
 
   return { hit: true, totalHits: newHits, isDown, downUntil };
 }

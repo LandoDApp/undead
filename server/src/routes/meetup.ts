@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { db } from '../config/database.js';
 import { meetups, meetupCheckins } from '../db/schema/social.js';
-import { safeZones } from '../db/schema/game.js';
+import { cityStates } from '../db/schema/game.js';
 import { users } from '../db/schema/auth.js';
 import { eq, and, gte } from 'drizzle-orm';
 
@@ -28,7 +28,7 @@ export async function meetupRoutes(app: FastifyInstance) {
         creatorId: meetups.creatorId,
         creatorName: users.displayName,
         zoneId: meetups.zoneId,
-        zoneName: safeZones.name,
+        zoneName: cityStates.name,
         title: meetups.title,
         scheduledAt: meetups.scheduledAt,
         isActive: meetups.isActive,
@@ -36,7 +36,7 @@ export async function meetupRoutes(app: FastifyInstance) {
       })
       .from(meetups)
       .leftJoin(users, eq(meetups.creatorId, users.id))
-      .leftJoin(safeZones, eq(meetups.zoneId, safeZones.id))
+      .leftJoin(cityStates, eq(meetups.zoneId, cityStates.id))
       .where(
         and(eq(meetups.isActive, true), gte(meetups.scheduledAt, new Date()))
       );

@@ -1,108 +1,117 @@
 import { create } from 'zustand';
-import type { ZombieState, TimeOfDay, ZombieCatchResponse } from '@undead/shared';
+import type { GhoulState, TimeOfDay, GhoulCatchResponse, GameMode } from '@undead/shared';
 import { PLAYER_MAX_HITS } from '@undead/shared';
 import { api } from '@/services/api';
 
 interface GameState {
-  zombies: ZombieState[];
+  ghouls: GhoulState[];
   timeOfDay: TimeOfDay;
   isGameActive: boolean;
-  isInSafeZone: boolean;
+  isInCityState: boolean;
   currentZoneId: string | null;
-  sessionStartedAt: number | null;
-  isPaused: boolean;
   // Player health (synced with server)
   playerHits: number;
   isDown: boolean;
   downUntil: number | null;
   showAttackOverlay: boolean;
-  setZombies: (zombies: ZombieState[]) => void;
-  updateZombie: (id: string, update: Partial<ZombieState>) => void;
-  removeZombie: (id: string) => void;
-  addZombie: (zombie: ZombieState) => void;
+  gameMode: GameMode;
+  isExitingJagd: boolean;
+  exitJagdCountdown: number;
+  setGameMode: (mode: GameMode) => void;
+  setGhouls: (ghouls: GhoulState[]) => void;
+  updateGhoul: (id: string, update: Partial<GhoulState>) => void;
+  removeGhoul: (id: string) => void;
+  addGhoul: (ghoul: GhoulState) => void;
   setTimeOfDay: (time: TimeOfDay) => void;
-  setInSafeZone: (inZone: boolean, zoneId?: string | null) => void;
-  /** Player presses "Start" — begin spawning zombies */
-  startGame: () => void;
-  /** Stop the game — clear zombies, go back to lobby */
-  stopGame: () => void;
-  startSession: () => void;
-  pauseSession: () => void;
-  resumeSession: () => void;
-  resetSession: () => void;
+  setInCityState: (inZone: boolean, zoneId?: string | null) => void;
+  setGameActive: (active: boolean) => void;
+  /** Enter Jagd mode — ghouls start spawning */
+  enterJagd: () => void;
+  /** Exit Jagd mode with 3s cooldown */
+  exitJagd: () => void;
   /** Apply server catch response to local state */
-  applyServerHit: (result: ZombieCatchResponse) => void;
+  applyServerHit: (result: GhoulCatchResponse) => void;
   revivePlayer: () => void;
   dismissAttackOverlay: () => void;
   /** Fetch health state from server on session start */
   syncHealth: () => void;
 }
 
+let exitJagdTimer: ReturnType<typeof setInterval> | null = null;
+
 export const useGameStore = create<GameState>((set, get) => ({
-  zombies: [],
+  ghouls: [],
   timeOfDay: 'day',
-  isGameActive: false,
-  isInSafeZone: false,
+  isGameActive: true,
+  isInCityState: false,
   currentZoneId: null,
-  sessionStartedAt: null,
-  isPaused: false,
   playerHits: 0,
   isDown: false,
   downUntil: null,
   showAttackOverlay: false,
+  gameMode: 'wandel',
+  isExitingJagd: false,
+  exitJagdCountdown: 0,
 
-  setZombies: (zombies) => set({ zombies }),
+  setGameMode: (gameMode) => set({ gameMode }),
 
-  updateZombie: (id, update) =>
+  setGhouls: (ghouls) => set({ ghouls }),
+
+  updateGhoul: (id, update) =>
     set((state) => ({
-      zombies: state.zombies.map((z) => (z.id === id ? { ...z, ...update } : z)),
+      ghouls: state.ghouls.map((g) => (g.id === id ? { ...g, ...update } : g)),
     })),
 
-  removeZombie: (id) =>
+  removeGhoul: (id) =>
     set((state) => ({
-      zombies: state.zombies.filter((z) => z.id !== id),
+      ghouls: state.ghouls.filter((g) => g.id !== id),
     })),
 
-  addZombie: (zombie) =>
+  addGhoul: (ghoul) =>
     set((state) => ({
-      zombies: [...state.zombies, zombie],
+      ghouls: [...state.ghouls, ghoul],
     })),
 
   setTimeOfDay: (timeOfDay) => set({ timeOfDay }),
 
-  setInSafeZone: (isInSafeZone, zoneId = null) => set({ isInSafeZone, currentZoneId: zoneId }),
+  setInCityState: (isInCityState, zoneId = null) => set({ isInCityState, currentZoneId: zoneId }),
 
-  startGame: () => set({ isGameActive: true, sessionStartedAt: Date.now(), isPaused: false }),
+  setGameActive: (isGameActive) => set({ isGameActive }),
 
-  stopGame: () =>
-    set({
-      isGameActive: false,
-      zombies: [],
-      sessionStartedAt: null,
-      playerHits: 0,
-      isDown: false,
-      downUntil: null,
-      showAttackOverlay: false,
-    }),
+  enterJagd: () => {
+    // Clear any pending exit timer
+    if (exitJagdTimer) {
+      clearInterval(exitJagdTimer);
+      exitJagdTimer = null;
+    }
+    set({ gameMode: 'jagd', isExitingJagd: false, exitJagdCountdown: 0 });
+  },
 
-  startSession: () => set({ sessionStartedAt: Date.now(), isPaused: false }),
+  exitJagd: () => {
+    if (get().isExitingJagd) return;
 
-  pauseSession: () => set({ isPaused: true }),
+    set({ isExitingJagd: true, exitJagdCountdown: 3 });
 
-  resumeSession: () => set({ isPaused: false }),
+    exitJagdTimer = setInterval(() => {
+      const current = get().exitJagdCountdown;
+      if (current <= 1) {
+        if (exitJagdTimer) {
+          clearInterval(exitJagdTimer);
+          exitJagdTimer = null;
+        }
+        set({
+          gameMode: 'wandel',
+          isExitingJagd: false,
+          exitJagdCountdown: 0,
+          ghouls: [],
+        });
+      } else {
+        set({ exitJagdCountdown: current - 1 });
+      }
+    }, 1000);
+  },
 
-  resetSession: () =>
-    set({
-      zombies: [],
-      sessionStartedAt: Date.now(),
-      isPaused: false,
-      playerHits: 0,
-      isDown: false,
-      downUntil: null,
-      showAttackOverlay: false,
-    }),
-
-  applyServerHit: (result: ZombieCatchResponse) => {
+  applyServerHit: (result: GhoulCatchResponse) => {
     if (!result.hit) return; // Server rejected the catch
 
     if (result.isDown) {
@@ -111,7 +120,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         isDown: true,
         downUntil: result.downUntil,
         showAttackOverlay: true,
-        zombies: get().zombies.map((z) => ({ ...z, frozen: true })),
+        ghouls: get().ghouls.map((g) => ({ ...g, frozen: true })),
       });
     } else {
       set({
@@ -129,9 +138,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       isDown: false,
       downUntil: null,
       showAttackOverlay: false,
-      zombies: state.isInSafeZone
-        ? state.zombies
-        : state.zombies.map((z) => ({ ...z, frozen: false })),
+      ghouls: state.isInCityState
+        ? state.ghouls
+        : state.ghouls.map((g) => ({ ...g, frozen: false })),
     }));
   },
 
@@ -143,7 +152,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         const { hits, isDown, downUntil } = res.data;
         set({ playerHits: hits, isDown, downUntil });
         if (isDown) {
-          set({ zombies: get().zombies.map((z) => ({ ...z, frozen: true })) });
+          set({ ghouls: get().ghouls.map((g) => ({ ...g, frozen: true })) });
         }
       }
     });

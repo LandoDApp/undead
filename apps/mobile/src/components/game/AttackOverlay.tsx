@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useGameStore } from '@/stores/game';
-import { colors, fontSize, spacing } from '@/theme';
+import { colors, fontSize, spacing, fontFamily } from '@/theme';
+import { icons, sprites } from '@/assets';
 
 export function AttackOverlay() {
   const { showAttackOverlay, isDown, downUntil, dismissAttackOverlay, revivePlayer, playerHits } =
@@ -47,8 +48,8 @@ export function AttackOverlay() {
   if (isDown) {
     return (
       <View style={styles.downOverlay}>
-        <Text style={styles.skullIcon}>💀</Text>
-        <Text style={styles.downTitle}>Du bist down!</Text>
+        <Image source={sprites.ghoul} style={styles.skullSprite} />
+        <Text style={styles.downTitle}>Du bist gefallen!</Text>
         <Text style={styles.countdownText}>{countdown}</Text>
         <Text style={styles.downSubtitle}>Sekunden bis zur Wiederbelebung</Text>
       </View>
@@ -64,8 +65,8 @@ export function AttackOverlay() {
     >
       <Animated.View style={[styles.flashFill, { opacity: flashOpacity }]} />
       <View style={styles.attackContent}>
-        <Text style={styles.attackIcon}>⚠️</Text>
-        <Text style={styles.attackTitle}>Du wurdest angegriffen!</Text>
+        <Image source={icons.sword} style={styles.attackIconImg} />
+        <Text style={styles.attackTitle}>Ein Ghoul hat dich erwischt!</Text>
         <Text style={styles.attackSubtitle}>Tippe zum Fortfahren</Text>
       </View>
     </TouchableOpacity>
@@ -86,14 +87,15 @@ const styles = StyleSheet.create({
   attackContent: {
     alignItems: 'center',
   },
-  attackIcon: {
-    fontSize: 64,
+  attackIconImg: {
+    width: 48,
+    height: 48,
     marginBottom: spacing.md,
   },
   attackTitle: {
     color: colors.text,
-    fontSize: fontSize.xxl,
-    fontWeight: '700',
+    fontSize: 12,
+    fontFamily: fontFamily.heading,
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 2 },
@@ -102,6 +104,7 @@ const styles = StyleSheet.create({
   attackSubtitle: {
     color: colors.textSecondary,
     fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
     marginTop: spacing.sm,
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -114,25 +117,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 100,
   },
-  skullIcon: {
-    fontSize: 80,
+  skullSprite: {
+    width: 96,
+    height: 144,
     marginBottom: spacing.md,
   },
   downTitle: {
     color: colors.danger,
-    fontSize: fontSize.xxl,
-    fontWeight: '700',
+    fontSize: 12,
+    fontFamily: fontFamily.heading,
     marginBottom: spacing.lg,
   },
   countdownText: {
     color: colors.text,
     fontSize: 72,
-    fontWeight: '700',
+    fontFamily: fontFamily.heading,
     lineHeight: 80,
   },
   downSubtitle: {
     color: colors.textSecondary,
     fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
     marginTop: spacing.md,
   },
 });

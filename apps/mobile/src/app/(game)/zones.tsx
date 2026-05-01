@@ -1,26 +1,26 @@
 import React, { useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
-import { useZoneStore } from '@/stores/zone';
+import { useCityStateStore } from '@/stores/zone';
 import { SafeZoneCard } from '@/components/safe-zone/SafeZoneCard';
 import { colors, spacing, fontSize } from '@/theme';
 
 export default function ZonesScreen() {
-  const { zones, isLoading, fetchZones } = useZoneStore();
+  const { cityStates, isLoading, fetchCityStates } = useCityStateStore();
 
   useEffect(() => {
-    fetchZones();
+    fetchCityStates();
   }, []);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Safe Zones</Text>
+      <Text style={styles.title}>Stadtstaaten</Text>
       <FlatList
-        data={zones}
+        data={cityStates}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <SafeZoneCard zone={item} />}
         contentContainerStyle={styles.list}
         refreshing={isLoading}
-        onRefresh={fetchZones}
+        onRefresh={fetchCityStates}
       />
     </View>
   );

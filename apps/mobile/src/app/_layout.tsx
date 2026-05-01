@@ -2,13 +2,28 @@ import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/services/api';
 import { colors } from '@/theme';
 
+SplashScreen.preventAutoHideAsync();
+
 export default function RootLayout() {
   const checkSession = useAuthStore((s) => s.checkSession);
   const setToken = useAuthStore((s) => s.setToken);
+
+  const [fontsLoaded] = useFonts({
+    'PressStart2P': require('../../assets/fonts/PressStart2P-Regular.ttf'),
+    'm6x11': require('../../assets/fonts/m6x11.ttf'),
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
 
   useEffect(() => {
     checkSession();
@@ -50,6 +65,10 @@ export default function RootLayout() {
       subscription.remove();
     };
   }, []);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <>

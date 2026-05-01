@@ -9,6 +9,8 @@ COPY server/package.json ./server/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
 
 # Install all workspace dependencies
+# Temporarily remove postinstall to avoid building shared before source is copied
+RUN node -e "const p=require('./package.json');delete p.scripts.postinstall;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))"
 RUN npm install
 
 # Copy and build shared package (required by server)

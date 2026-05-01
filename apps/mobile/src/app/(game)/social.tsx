@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSocialStore } from '@/stores/social';
-import { useZoneStore } from '@/stores/zone';
+import { useCityStateStore } from '@/stores/zone';
 import { MeetupCard } from '@/components/social/MeetupCard';
 import { FriendCard } from '@/components/social/FriendCard';
 import { Button, Input } from '@/components/ui';
@@ -26,7 +26,7 @@ export default function SocialScreen() {
     sendFriendRequest,
     createMeetup,
   } = useSocialStore();
-  const { zones, fetchZones } = useZoneStore();
+  const { cityStates: zones, fetchCityStates: fetchZones } = useCityStateStore();
 
   useEffect(() => {
     fetchMeetups();

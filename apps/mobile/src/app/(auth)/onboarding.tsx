@@ -12,15 +12,15 @@ export default function OnboardingScreen() {
       <View style={styles.section}>
         <Text style={styles.heading}>So funktioniert's</Text>
         <Text style={styles.text}>
-          Zombies spawnen in deiner Nähe und bewegen sich auf echten Gehwegen auf dich zu.
-          Flieh zu einer Safe Zone, um sicher zu sein!
+          Ghoule erscheinen in deiner Nähe und bewegen sich auf echten Gehwegen auf dich zu.
+          Flieh zu einem Stadtstaat, um sicher zu sein!
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.heading}>Safe Zones</Text>
+        <Text style={styles.heading}>Stadtstaaten</Text>
         <Text style={styles.text}>
-          Grüne Bereiche auf der Karte sind sichere Orte. Dort frieren Zombies ein
+          Grüne Bereiche auf der Karte sind sichere Orte. Dort werden Ghoule gebannt
           und du kannst andere Spieler treffen.
         </Text>
       </View>
@@ -36,7 +36,7 @@ export default function OnboardingScreen() {
       <View style={styles.section}>
         <Text style={styles.heading}>Standort-Berechtigung</Text>
         <Text style={styles.text}>
-          Undead benötigt Zugriff auf deinen Standort, um dir Zombies und Safe Zones
+          Undead benötigt Zugriff auf deinen Standort, um dir Ghoule und Stadtstaaten
           in deiner Nähe zu zeigen. Tracking erfolgt nur im Vordergrund.
         </Text>
       </View>

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, integer, primaryKey } from 'drizzle-orm/pg-core';
 import { users } from './auth.js';
-import { safeZones } from './game.js';
+import { cityStates } from './game.js';
 
 export const meetups = pgTable('meetups', {
   id: text('id').primaryKey(),
@@ -9,7 +9,7 @@ export const meetups = pgTable('meetups', {
     .references(() => users.id, { onDelete: 'cascade' }),
   zoneId: text('zone_id')
     .notNull()
-    .references(() => safeZones.id, { onDelete: 'cascade' }),
+    .references(() => cityStates.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   scheduledAt: timestamp('scheduled_at').notNull(),
   isActive: boolean('is_active').notNull().default(true),

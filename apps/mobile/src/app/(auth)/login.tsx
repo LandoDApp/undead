@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, KeyboardAvoidingView, Platform } from 'react-na
 import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { Button, Input } from '@/components/ui';
-import { colors, spacing, fontSize } from '@/theme';
+import { colors, spacing, fontSize, fontFamily } from '@/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -23,7 +23,7 @@ export default function LoginScreen() {
 
   const handleSendLink = async () => {
     if (!email.includes('@')) {
-      setError('Bitte gib eine gültige E-Mail ein');
+      setError('Bitte gib eine g\u00fcltige E-Mail ein');
       return;
     }
     setError('');
@@ -36,7 +36,7 @@ export default function LoginScreen() {
         setError('Fehler beim Senden. Versuche es erneut.');
       }
     } catch {
-      setError('Netzwerkfehler. Bitte prüfe deine Verbindung.');
+      setError('Netzwerkfehler. Bitte pr\u00fcfe deine Verbindung.');
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ export default function LoginScreen() {
 
   const handleDevLogin = async () => {
     if (!email.includes('@')) {
-      setError('Bitte gib eine gültige E-Mail ein');
+      setError('Bitte gib eine g\u00fcltige E-Mail ein');
       return;
     }
     setError('');
@@ -54,7 +54,7 @@ export default function LoginScreen() {
       if (success) {
         router.replace('/(game)');
       } else {
-        setError('Dev-Login fehlgeschlagen. Prüfe, ob der Account existiert.');
+        setError('Dev-Login fehlgeschlagen. Pr\u00fcfe, ob der Account existiert.');
       }
     } catch {
       setError('Dev-Login fehlgeschlagen.');
@@ -125,14 +125,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   title: {
-    fontSize: fontSize.xxl,
-    fontWeight: 'bold',
-    color: colors.primary,
+    fontSize: 14,
+    fontFamily: fontFamily.heading,
+    color: colors.gold,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
