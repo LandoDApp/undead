@@ -86,20 +86,30 @@ export const useBastionStore = create<BastionState>((set) => ({
   },
 
   fetchIdleState: async () => {
-    const res = await api.bastion.getIdleState();
-    if (res.success && res.data) {
-      set({ workers: res.data.workers, storage: res.data.storage });
+    try {
+      const res = await api.bastion.getIdleState();
+      if (res.success && res.data) {
+        set({ workers: res.data.workers, storage: res.data.storage });
+      }
+    } catch (err) {
+      console.error('[bastion] fetchIdleState failed:', err);
     }
   },
 
   collectStorage: async () => {
-    const res = await api.bastion.collect();
-    if (res.success && res.data) {
-      set({ storage: res.data.newStorage });
-      useResourceStore.getState().setBalance(res.data.newBalance);
-      return true;
+    try {
+      const res = await api.bastion.collect();
+      if (res.success && res.data) {
+        set({ storage: res.data.newStorage });
+        useResourceStore.getState().setBalance(res.data.newBalance);
+        return true;
+      }
+      console.error('[bastion] collectStorage failed:', (res as any).error || 'unknown');
+      return false;
+    } catch (err) {
+      console.error('[bastion] collectStorage error:', err);
+      return false;
     }
-    return false;
   },
 
   assignWorker: async (workerType) => {

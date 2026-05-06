@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 import { useQuestStore } from '@/stores/quests';
+import { FrameView } from '@/components/ui/FrameView';
 import type { Quest } from '@undead/shared';
 
 export function QuestTracker() {
@@ -9,7 +11,6 @@ export function QuestTracker() {
   const weekly = useQuestStore((s) => s.weekly);
   const [showModal, setShowModal] = useState(false);
 
-  // Show up to 2 active (unclaimed) quests in the compact tracker
   const activeQuests = [...daily, ...weekly]
     .filter((q) => !q.claimedAt)
     .slice(0, 2);
@@ -28,13 +29,40 @@ export function QuestTracker() {
         ))}
       </TouchableOpacity>
 
-      <Modal transparent animationType="slide" visible={showModal} onRequestClose={() => setShowModal(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setShowModal(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>Auftr{'\u00e4'}ge</Text>
+      <QuestModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        daily={daily}
+        weekly={weekly}
+      />
+    </>
+  );
+}
 
-            <ScrollView style={styles.scrollArea}>
+function QuestModal({
+  visible,
+  onClose,
+  daily,
+  weekly,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  daily: Quest[];
+  weekly: Quest[];
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable
+          style={[styles.modalWrap, { marginTop: insets.top + 20, marginBottom: insets.bottom + 20 }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <FrameView variant="light" paddingH={24} paddingTop={28} paddingBottom={24}>
+            <Text style={styles.modalTitle}>Auftr{'\u00e4'}ge</Text>
+
+            <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
               <Text style={styles.sectionLabel}>T{'\u00e4'}glich</Text>
               {daily.map((q) => (
                 <QuestRow key={q.id} quest={q} />
@@ -46,13 +74,13 @@ export function QuestTracker() {
               ))}
             </ScrollView>
 
-            <TouchableOpacity style={styles.closeButton} onPress={() => setShowModal(false)}>
+            <Pressable style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeText}>Schlie{'\u00df'}en</Text>
-            </TouchableOpacity>
-          </Pressable>
+            </Pressable>
+          </FrameView>
         </Pressable>
-      </Modal>
-    </>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -82,10 +110,10 @@ function QuestRow({ quest }: { quest: Quest }) {
     }
   };
 
-  const rewardIcon = quest.rewardType === 'herb' ? '🌿'
-    : quest.rewardType === 'crystal' ? '💎'
-    : quest.rewardType === 'relic' ? '✨'
-    : '⭐';
+  const rewardLabel = quest.rewardType === 'herb' ? 'Kraut'
+    : quest.rewardType === 'crystal' ? 'Kristall'
+    : quest.rewardType === 'relic' ? 'Relikt'
+    : 'XP';
 
   return (
     <View style={[styles.questRow, isClaimed && styles.questClaimed]}>
@@ -93,105 +121,85 @@ function QuestRow({ quest }: { quest: Quest }) {
         <Text style={styles.questTitle}>{quest.title}</Text>
         <Text style={styles.questDesc}>{quest.description}</Text>
         <View style={styles.questBarBg}>
-          <View style={[styles.questBarFill, { width: `${percent}%`, backgroundColor: isComplete ? colors.primary : colors.warning }]} />
+          <View style={[styles.questBarFill, { width: `${percent}%`, backgroundColor: isComplete ? '#27ae60' : '#5a3e1b' }]} />
         </View>
         <Text style={styles.questProgress}>{quest.currentValue}/{quest.targetValue}</Text>
       </View>
       <View style={styles.questReward}>
-        <Text style={styles.rewardIcon}>{rewardIcon}</Text>
         <Text style={styles.rewardAmount}>{quest.rewardAmount}</Text>
+        <Text style={styles.rewardLabel}>{rewardLabel}</Text>
         {isComplete && !isClaimed && (
-          <TouchableOpacity style={styles.claimButton} onPress={handleClaim} activeOpacity={0.7}>
+          <Pressable style={styles.claimButton} onPress={handleClaim}>
             <Text style={styles.claimText}>!</Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
-        {isClaimed && <Text style={styles.claimedCheck}>✓</Text>}
+        {isClaimed && <Text style={styles.claimedCheck}>{'\u2713'}</Text>}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Compact tracker (inline in HUD frame)
   tracker: {
-    position: 'absolute',
-    top: 100,
-    left: spacing.sm,
-    gap: spacing.xs,
-    maxWidth: 140,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   miniCard: {
-    backgroundColor: colors.parchment + 'E0',
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.warning,
-    borderWidth: 1,
-    borderColor: colors.gold + '20',
+    flex: 1,
+    padding: spacing.xs,
   },
-  miniCardComplete: {
-    borderLeftColor: colors.primary,
-  },
+  miniCardComplete: {},
   miniTitle: {
-    color: colors.text,
-    fontSize: 14,
+    color: '#2f1f14',
+    fontSize: 13,
     fontFamily: fontFamily.body,
     fontWeight: '600',
     marginBottom: 2,
   },
   miniBarBg: {
     height: 4,
-    backgroundColor: colors.background,
+    backgroundColor: '#2f1f1430',
     borderRadius: 2,
     overflow: 'hidden',
     marginBottom: 2,
   },
   miniBarFill: {
     height: '100%',
-    backgroundColor: colors.warning,
+    backgroundColor: '#5a3e1b',
     borderRadius: 2,
   },
   miniProgress: {
-    color: colors.textMuted,
-    fontSize: 12,
+    color: '#5a3e1b',
+    fontSize: 11,
     fontFamily: fontFamily.body,
   },
+
   // Modal
   backdrop: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sheet: {
-    backgroundColor: colors.parchment,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    borderTopWidth: 2,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.gold + '50',
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-    maxHeight: '70%',
+  modalWrap: {
+    marginHorizontal: 16,
+    maxHeight: '80%',
+    width: '90%',
   },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.gold + '40',
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  sheetTitle: {
-    color: colors.gold,
+  modalTitle: {
+    color: '#2f1f14',
     fontSize: 10,
     fontFamily: fontFamily.heading,
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
   scrollArea: {
-    flex: 1,
+    flexGrow: 0,
   },
   sectionLabel: {
-    color: colors.textSecondary,
+    color: '#5a3e1b',
     fontSize: 14,
     fontFamily: fontFamily.body,
     fontWeight: '600',
@@ -200,12 +208,10 @@ const styles = StyleSheet.create({
   },
   questRow: {
     flexDirection: 'row',
-    backgroundColor: colors.parchmentLight,
+    backgroundColor: '#2f1f140d',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.gold + '20',
   },
   questClaimed: {
     opacity: 0.5,
@@ -214,20 +220,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   questTitle: {
-    color: colors.text,
+    color: '#2f1f14',
     fontSize: fontSize.md,
     fontFamily: fontFamily.body,
     fontWeight: '600',
   },
   questDesc: {
-    color: colors.textSecondary,
+    color: '#5a3e1b',
     fontSize: 14,
     fontFamily: fontFamily.body,
     marginBottom: spacing.xs,
   },
   questBarBg: {
     height: 6,
-    backgroundColor: colors.background,
+    backgroundColor: '#2f1f1420',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: spacing.xs,
@@ -237,7 +243,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   questProgress: {
-    color: colors.textMuted,
+    color: '#5a3e1b',
     fontSize: fontSize.xs,
     fontFamily: fontFamily.body,
   },
@@ -247,44 +253,45 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
     gap: 2,
   },
-  rewardIcon: {
-    fontSize: 20,
-  },
   rewardAmount: {
-    color: colors.gold,
-    fontSize: fontSize.sm,
+    color: '#5a3e1b',
+    fontSize: fontSize.lg,
     fontFamily: fontFamily.body,
     fontWeight: '700',
   },
+  rewardLabel: {
+    color: '#5a3e1b',
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.body,
+  },
   claimButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#27ae60',
     width: 24,
     height: 24,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 4,
   },
   claimText: {
-    color: colors.text,
+    color: '#fff',
     fontSize: fontSize.md,
     fontWeight: '700',
   },
   claimedCheck: {
-    color: colors.primary,
+    color: '#27ae60',
     fontSize: fontSize.lg,
     fontWeight: '700',
   },
   closeButton: {
-    backgroundColor: colors.parchmentLight,
-    paddingVertical: spacing.md,
+    backgroundColor: '#2f1f140d',
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
     alignItems: 'center',
     marginTop: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.gold + '30',
   },
   closeText: {
-    color: colors.text,
+    color: '#2f1f14',
     fontSize: fontSize.md,
     fontFamily: fontFamily.body,
     fontWeight: '600',

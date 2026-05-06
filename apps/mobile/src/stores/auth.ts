@@ -6,6 +6,7 @@ import * as tokenStorage from '@/services/token-storage';
 interface AuthState {
   user: User | null;
   clan: ClanType | null;
+  isHidden: boolean;
   isLoading: boolean;
   isAuthenticated: boolean;
   signUp: (email: string, displayName: string) => Promise<boolean>;
@@ -17,11 +18,14 @@ interface AuthState {
   setToken: (token: string) => Promise<void>;
   setClan: (clan: ClanType) => Promise<boolean>;
   fetchClan: () => Promise<void>;
+  setVisibility: (hidden: boolean) => Promise<boolean>;
+  fetchVisibility: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   clan: null,
+  isHidden: false,
   isLoading: true,
   isAuthenticated: false,
 
@@ -52,8 +56,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         const profileRes = await api.player.getProfile();
         if (profileRes.success && profileRes.data) {
           set({ user: profileRes.data as any, isAuthenticated: true });
-          // Fetch clan in background
+          // Fetch clan and visibility in background
           useAuthStore.getState().fetchClan();
+          useAuthStore.getState().fetchVisibility();
           return;
         }
       }
@@ -62,11 +67,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (res.success && res.data) {
         set({ user: res.data as any, isAuthenticated: true });
         useAuthStore.getState().fetchClan();
+        useAuthStore.getState().fetchVisibility();
       } else {
-        set({ user: null, isAuthenticated: false, clan: null });
+        set({ user: null, isAuthenticated: false, clan: null, isHidden: false });
       }
     } catch {
-      set({ user: null, isAuthenticated: false, clan: null });
+      set({ user: null, isAuthenticated: false, clan: null, isHidden: false });
     } finally {
       set({ isLoading: false });
     }
@@ -75,13 +81,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   signOut: async () => {
     await api.auth.signOut();
     await tokenStorage.removeToken();
-    set({ user: null, isAuthenticated: false, clan: null });
+    set({ user: null, isAuthenticated: false, clan: null, isHidden: false });
   },
 
   deleteAccount: async () => {
     await api.auth.deleteUser();
     await tokenStorage.removeToken();
-    set({ user: null, isAuthenticated: false, clan: null });
+    set({ user: null, isAuthenticated: false, clan: null, isHidden: false });
   },
 
   setToken: async (token) => {
@@ -106,6 +112,26 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     } catch {
       // Ignore fetch errors for clan
+    }
+  },
+
+  setVisibility: async (hidden) => {
+    const res = await api.player.setVisibility(hidden);
+    if (res.success && res.data) {
+      set({ isHidden: res.data.hidden });
+      return true;
+    }
+    return false;
+  },
+
+  fetchVisibility: async () => {
+    try {
+      const res = await api.player.getVisibility();
+      if (res.success && res.data) {
+        set({ isHidden: res.data.hidden });
+      }
+    } catch {
+      // Ignore fetch errors for visibility
     }
   },
 }));

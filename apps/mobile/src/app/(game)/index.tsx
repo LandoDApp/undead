@@ -2,6 +2,9 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { GameMap } from '@/components/map/GameMap';
 import type { GameMapHandle } from '@/components/map/GameMap';
+import { ParchmentOverlay } from '@/components/map/ParchmentOverlay';
+import { FogOverlay } from '@/components/map/FogOverlay';
+import { VignetteOverlay } from '@/components/map/VignetteOverlay';
 import { GameHUD } from '@/components/game/GameHUD';
 import { AttackOverlay } from '@/components/game/AttackOverlay';
 import { EntryCollect } from '@/components/game/EntryCollect';
@@ -73,7 +76,10 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <GameMap ref={mapRef} />
-      <GameHUD mapRef={mapRef} />
+      <ParchmentOverlay />
+      <FogOverlay />
+      <VignetteOverlay />
+      <GameHUD mapRef={mapRef} ticker="Willkommen in den Schattenlanden \u2014 Halte deine Bastion stark und sammle Ressourcen bevor die Nacht hereinbricht..." />
       <AttackOverlay />
       {entryState === 'onboarding' && (
         <OnboardingTutorial onComplete={handleOnboardingComplete} />

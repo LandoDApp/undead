@@ -1,9 +1,8 @@
 import React, { memo, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Constants from 'expo-constants';
 import { colors, fontSize, fontFamily } from '@/theme';
 import { useGameStore } from '@/stores/game';
-import type { Bastion } from '@undead/shared';
 
 let MapLibreGL: any = null;
 let PlayerMarker: any = null;
@@ -11,8 +10,6 @@ let GhoulMarkers: any = null;
 let CityStateLayer: any = null;
 let ZoneInfoModal: any = null;
 let ResourceMarkers: any = null;
-let BastionMarkersComp: any = null;
-let BastionPanelComp: any = null;
 
 try {
   MapLibreGL = require('@maplibre/maplibre-react-native').default;
@@ -21,34 +18,328 @@ try {
   CityStateLayer = require('./CityStateLayer').CityStateLayer;
   ZoneInfoModal = require('./ZoneInfoModal').ZoneInfoModal;
   ResourceMarkers = require('./ResourceMarkers').ResourceMarkers;
-  BastionMarkersComp = require('./BastionMarkers').BastionMarkers;
-  BastionPanelComp = require('../bastion/BastionPanel').BastionPanel;
 } catch {}
 
 const MAPTILER_KEY = Constants.expoConfig?.extra?.mapTilerKey;
+
+const MAP_SOURCES = {
+  cartoLightNoLabels: {
+    type: 'raster',
+    tiles: [
+      'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+      'https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+      'https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+      'https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+    ],
+    tileSize: 256,
+  },
+  openmaptiles: {
+    type: 'vector',
+    url: `https://api.maptiler.com/tiles/v3/tiles.json?key=${MAPTILER_KEY}`,
+  },
+};
+
+const LABEL_FONT = ['Noto Serif Regular'];
+
+const VECTOR_LAYERS_WANDEL = [
+  // Buildings
+  {
+    id: 'building-fill',
+    type: 'fill',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 14,
+    paint: {
+      'fill-color': '#8a8078',
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.15, 16, 0.35],
+    },
+  },
+  {
+    id: 'building-outline',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 15,
+    paint: {
+      'line-color': '#6a5f55',
+      'line-width': 0.6,
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0.2, 17, 0.45],
+    },
+  },
+  // Water
+  {
+    id: 'water-fill',
+    type: 'fill',
+    source: 'openmaptiles',
+    'source-layer': 'water',
+    minzoom: 8,
+    paint: {
+      'fill-color': '#5b8fa8',
+      'fill-opacity': 0.35,
+    },
+  },
+  {
+    id: 'waterway-line',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'waterway',
+    minzoom: 12,
+    paint: {
+      'line-color': '#5b8fa8',
+      'line-width': 1.5,
+      'line-opacity': 0.5,
+    },
+  },
+  {
+    id: 'road-major',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'transportation',
+    minzoom: 8,
+    filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#3a3228',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 15, 1.8, 18, 3],
+      'line-opacity': 0.55,
+    },
+  },
+  {
+    id: 'road-minor',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'transportation',
+    minzoom: 13,
+    filter: ['in', 'class', 'minor', 'service', 'track', 'path'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#5a4632',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.5, 15, 1.0, 18, 2],
+      'line-opacity': 0.4,
+    },
+  },
+  // Road labels
+  {
+    id: 'road-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'transportation_name',
+    minzoom: 14,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': LABEL_FONT,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10, 18, 14],
+      'symbol-placement': 'line',
+      'text-rotation-alignment': 'map',
+      'text-max-angle': 30,
+    },
+    paint: {
+      'text-color': '#3a2a18',
+      'text-halo-color': '#e6d3ad',
+      'text-halo-width': 1.5,
+      'text-opacity': 0.85,
+    },
+  },
+  // Place labels (neighborhoods, suburbs, villages — NOT countries/states)
+  {
+    id: 'place-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'place',
+    minzoom: 12,
+    filter: ['in', 'class', 'town', 'village', 'hamlet', 'suburb', 'quarter', 'neighbourhood'],
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': LABEL_FONT,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 11, 16, 16],
+      'text-anchor': 'center',
+      'text-transform': 'uppercase',
+      'text-letter-spacing': 0.1,
+    },
+    paint: {
+      'text-color': '#2f1f14',
+      'text-halo-color': '#e6d3ad',
+      'text-halo-width': 1.8,
+      'text-opacity': 0.8,
+    },
+  },
+  // Water labels
+  {
+    id: 'water-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'water_name',
+    minzoom: 12,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': LABEL_FONT,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
+      'text-letter-spacing': 0.15,
+    },
+    paint: {
+      'text-color': '#2a4a5a',
+      'text-halo-color': '#c8dde8',
+      'text-halo-width': 1.2,
+      'text-opacity': 0.8,
+    },
+  },
+];
+
+const VECTOR_LAYERS_JAGD = [
+  // Buildings (Jagd — darker stone)
+  {
+    id: 'building-fill',
+    type: 'fill',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 14,
+    paint: {
+      'fill-color': '#3a3530',
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.2, 16, 0.4],
+    },
+  },
+  {
+    id: 'building-outline',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'building',
+    minzoom: 15,
+    paint: {
+      'line-color': '#4a4540',
+      'line-width': 0.6,
+      'line-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0.25, 17, 0.5],
+    },
+  },
+  // Water
+  {
+    id: 'water-fill',
+    type: 'fill',
+    source: 'openmaptiles',
+    'source-layer': 'water',
+    minzoom: 8,
+    paint: {
+      'fill-color': '#2a4a5a',
+      'fill-opacity': 0.4,
+    },
+  },
+  {
+    id: 'waterway-line',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'waterway',
+    minzoom: 12,
+    paint: {
+      'line-color': '#2a4a5a',
+      'line-width': 1.5,
+      'line-opacity': 0.5,
+    },
+  },
+  {
+    id: 'road-major',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'transportation',
+    minzoom: 8,
+    filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#6a5a4a',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 15, 1.8, 18, 3],
+      'line-opacity': 0.5,
+    },
+  },
+  {
+    id: 'road-minor',
+    type: 'line',
+    source: 'openmaptiles',
+    'source-layer': 'transportation',
+    minzoom: 13,
+    filter: ['in', 'class', 'minor', 'service', 'track', 'path'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#5a4a3a',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 13, 0.5, 15, 1.0, 18, 2],
+      'line-opacity': 0.4,
+    },
+  },
+  // Road labels (Jagd — dimmer)
+  {
+    id: 'road-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'transportation_name',
+    minzoom: 14,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': LABEL_FONT,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10, 18, 14],
+      'symbol-placement': 'line',
+      'text-rotation-alignment': 'map',
+      'text-max-angle': 30,
+    },
+    paint: {
+      'text-color': '#8a7a60',
+      'text-halo-color': '#1a1510',
+      'text-halo-width': 1.2,
+      'text-opacity': 0.6,
+    },
+  },
+  // Place labels (Jagd)
+  {
+    id: 'place-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'place',
+    minzoom: 12,
+    filter: ['in', 'class', 'town', 'village', 'hamlet', 'suburb', 'quarter', 'neighbourhood'],
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': LABEL_FONT,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 11, 16, 16],
+      'text-anchor': 'center',
+      'text-transform': 'uppercase',
+      'text-letter-spacing': 0.1,
+    },
+    paint: {
+      'text-color': '#9a8a6a',
+      'text-halo-color': '#1a1510',
+      'text-halo-width': 1.5,
+      'text-opacity': 0.65,
+    },
+  },
+  // Water labels (Jagd)
+  {
+    id: 'water-label',
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': 'water_name',
+    minzoom: 12,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-font': LABEL_FONT,
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
+      'text-letter-spacing': 0.15,
+    },
+    paint: {
+      'text-color': '#4a7a8a',
+      'text-halo-color': '#1a1510',
+      'text-halo-width': 1.0,
+      'text-opacity': 0.55,
+    },
+  },
+];
 
 const MAP_STYLE_WANDEL = {
   version: 8,
   name: 'undead-parchment-day',
   glyphs: `https://api.maptiler.com/fonts/{fontstack}/{range}.pbf?key=${MAPTILER_KEY}`,
-  sources: {
-    cartoLightNoLabels: {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-    },
-  },
+  sources: MAP_SOURCES,
   layers: [
     {
       id: 'bg',
       type: 'background',
       paint: {
-        'background-color': '#f6edd6',
+        'background-color': '#f4e8c1',
       },
     },
     {
@@ -56,14 +347,15 @@ const MAP_STYLE_WANDEL = {
       type: 'raster',
       source: 'cartoLightNoLabels',
       paint: {
-        'raster-opacity': 0.4,
-        'raster-saturation': -0.6,
-        'raster-contrast': 0.25,
-        'raster-brightness-min': 0.2,
-        'raster-brightness-max': 1.0,
-        'raster-hue-rotate': 28,
+        'raster-opacity': 0.55,
+        'raster-saturation': -0.35,
+        'raster-contrast': 0.3,
+        'raster-brightness-min': 0.15,
+        'raster-brightness-max': 0.95,
+        'raster-hue-rotate': 15,
       },
     },
+    ...VECTOR_LAYERS_WANDEL,
   ],
 } as const;
 
@@ -75,7 +367,7 @@ const MAP_STYLE_JAGD = {
       id: 'bg',
       type: 'background',
       paint: {
-        'background-color': '#d8c6a0',
+        'background-color': '#2a2218',
       },
     },
     {
@@ -83,14 +375,15 @@ const MAP_STYLE_JAGD = {
       type: 'raster',
       source: 'cartoLightNoLabels',
       paint: {
-        'raster-opacity': 0.35,
-        'raster-saturation': -0.7,
-        'raster-contrast': 0.35,
-        'raster-brightness-min': 0.2,
-        'raster-brightness-max': 0.8,
-        'raster-hue-rotate': 210,
+        'raster-opacity': 0.45,
+        'raster-saturation': -0.5,
+        'raster-contrast': 0.4,
+        'raster-brightness-min': 0.05,
+        'raster-brightness-max': 0.55,
+        'raster-hue-rotate': 200,
       },
     },
+    ...VECTOR_LAYERS_JAGD,
   ],
 } as const;
 
@@ -103,8 +396,6 @@ export interface GameMapHandle {
 const GameMapInner = memo(forwardRef<GameMapHandle, { mapStyle: any }>(function GameMapInner({ mapStyle }, ref) {
   const cameraRef = useRef<any>(null);
   const [selectedZone, setSelectedZone] = useState(null);
-  const [selectedBastion, setSelectedBastion] = useState<Bastion | null>(null);
-  const [isBastionOwn, setIsBastionOwn] = useState(false);
 
   useImperativeHandle(ref, () => ({
     flyToPlayer: (lat: number, lon: number) => {
@@ -120,18 +411,6 @@ const GameMapInner = memo(forwardRef<GameMapHandle, { mapStyle: any }>(function 
     setSelectedZone(zone);
   }, []);
 
-  const handleBastionPress = useCallback((props: any) => {
-    const { useBastionStore } = require('@/stores/bastion');
-    const own = useBastionStore.getState().bastion;
-    setIsBastionOwn(own?.id === props.id);
-
-    setSelectedBastion({
-      ...props,
-      latitude: 0,
-      longitude: 0,
-      createdAt: 0,
-    });
-  }, []);
 
   if (!MapLibreGL) {
     return (
@@ -161,42 +440,13 @@ const GameMapInner = memo(forwardRef<GameMapHandle, { mapStyle: any }>(function 
 
           <CityStateLayer onZonePress={handleZonePress} />
           {ResourceMarkers && <ResourceMarkers />}
-          {BastionMarkersComp && <BastionMarkersComp onBastionPress={handleBastionPress} />}
           <GhoulMarkers />
           <PlayerMarker />
         </MapLibreGL.MapView>
-
-        {/* TEXTURE */}
-        <View pointerEvents="none" style={mapStyles.textureWrapper}>
-          <Image
-            source={require('@/assets/images/parchment.png')}
-            style={mapStyles.textureOverlay}
-            resizeMode="cover"
-          />
-        </View>
-
-        {/* LIGHT SEPIA */}
-        <View pointerEvents="none" style={mapStyles.sepiaOverlay} />
-
-        {/* FRAME PNG */}
-        <View pointerEvents="none" style={mapStyles.frameWrapper}>
-          <Image
-            source={require('@/assets/images/Frame.png')}
-            style={mapStyles.frameOverlay}
-            resizeMode="stretch"
-          />
-        </View>
       </View>
 
       {ZoneInfoModal && (
         <ZoneInfoModal zone={selectedZone} onClose={() => setSelectedZone(null)} />
-      )}
-      {BastionPanelComp && (
-        <BastionPanelComp
-          bastion={selectedBastion}
-          isOwn={isBastionOwn}
-          onClose={() => setSelectedBastion(null)}
-        />
       )}
     </>
   );
@@ -212,32 +462,6 @@ export const GameMap = forwardRef<GameMapHandle>(function GameMap(_, ref) {
 const mapStyles = StyleSheet.create({
   mapContainer: { flex: 1 },
   map: { flex: 1 },
-
-  textureWrapper: {
-    ...StyleSheet.absoluteFillObject,
-  },
-
-  textureOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.12,
-  },
-
-  sepiaOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#b89a6a',
-    opacity: 0.08,
-  },
-
-  frameWrapper: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  
-  frameOverlay: {
-    width: '100%',
-    height: '100%',
-  },
 });
 
 const fallbackStyles = StyleSheet.create({

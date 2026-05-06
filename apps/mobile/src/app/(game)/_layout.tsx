@@ -1,25 +1,31 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Pressable, Text, StyleSheet } from 'react-native';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontFamily } from '@/theme';
+
+function BackButton() {
+  return (
+    <Pressable style={styles.backButton} onPress={() => router.back()}>
+      <Ionicons name="arrow-back" size={20} color={colors.gold} />
+    </Pressable>
+  );
+}
 
 export default function GameLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.gold + '30',
-          borderTopWidth: 1,
+        tabBarStyle: { display: 'none', height: 0 },
+        headerStyle: {
+          backgroundColor: colors.background,
         },
-        tabBarActiveTintColor: colors.gold,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: {
-          fontFamily: fontFamily.body,
-          fontSize: 14,
+        headerTintColor: colors.gold,
+        headerTitleStyle: {
+          fontFamily: fontFamily.heading,
+          fontSize: 10,
+          color: colors.gold,
         },
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.text,
         headerShown: false,
       }}
     >
@@ -27,30 +33,23 @@ export default function GameLayout() {
         name="index"
         options={{
           title: 'Karte',
-          tabBarLabel: 'Karte',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" size={size} color={color} />
-          ),
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="bastion"
         options={{
           title: 'Bastion',
-          tabBarLabel: 'Bastion',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="shield" size={size} color={color} />
-          ),
+          headerShown: true,
+          headerLeft: () => <BackButton />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profil',
-          tabBarLabel: 'Profil',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
+          headerShown: true,
+          headerLeft: () => <BackButton />,
         }}
       />
       {/* Hidden from tab bar but still routable */}
@@ -69,3 +68,10 @@ export default function GameLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  backButton: {
+    marginLeft: 12,
+    padding: 6,
+  },
+});

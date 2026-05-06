@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Switch } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { Button } from '@/components/ui';
@@ -72,7 +72,7 @@ function TutorialCard({ title, content }: { title: string; content: string }) {
 }
 
 export default function ProfileScreen() {
-  const { user, clan, signOut, deleteAccount } = useAuthStore();
+  const { user, clan, isHidden, signOut, deleteAccount, setVisibility } = useAuthStore();
 
   const handleSignOut = async () => {
     await signOut();
@@ -122,6 +122,19 @@ export default function ProfileScreen() {
             </View>
           </View>
         )}
+      </View>
+
+      {/* Visibility toggle */}
+      <View style={styles.card}>
+        <View style={styles.visibilityRow}>
+          <Text style={styles.visibilityLabel}>Auf der Karte verstecken</Text>
+          <Switch
+            value={isHidden}
+            onValueChange={(val) => setVisibility(val)}
+            trackColor={{ false: colors.background, true: colors.gold + '60' }}
+            thumbColor={isHidden ? colors.gold : colors.textMuted}
+          />
+        </View>
       </View>
 
       {/* Tutorial / Handbuch */}
@@ -221,6 +234,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontFamily.body,
     fontWeight: '600',
+  },
+  visibilityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  visibilityLabel: {
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    color: colors.text,
+    flex: 1,
   },
   section: {
     marginBottom: spacing.lg,

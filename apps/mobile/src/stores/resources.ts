@@ -41,6 +41,8 @@ export const useResourceStore = create<ResourcesState>((set) => ({
         resources: s.resources.filter((r) => r.id !== resourceId),
         balance: res.data!.newBalance,
       }));
+      // Refresh quests so collect-category progress updates
+      import('@/stores/quests').then((m) => m.useQuestStore.getState().fetchQuests()).catch(() => {});
       return true;
     }
     return false;

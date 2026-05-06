@@ -40,7 +40,11 @@ export function usePedometer() {
       const steps = stepsRef.current - lastReportRef.current;
       if (steps > 0) {
         lastReportRef.current = stepsRef.current;
-        api.steps.report(steps).catch(() => {});
+        api.steps.report(steps).then((res) => {
+          if (res.success && res.data) {
+            useGameStore.getState().setStepsData(res.data.stepsToday, res.data.totalXp);
+          }
+        }).catch(() => {});
       }
     }, REPORT_INTERVAL);
 

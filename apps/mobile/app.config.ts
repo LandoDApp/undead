@@ -9,6 +9,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'dark',
 
   splash: {
+    image: './assets/splashscreen_logo.png',
+    resizeMode: 'contain',
     backgroundColor: '#1a1a2e',
   },
 
@@ -33,7 +35,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: 'undead',
 
   extra: {
-    apiUrl: 'https://undead-server.loca.lt',
+    apiUrl: 'https://subtype-chalice-mulled.ngrok-free.dev',
     mapTilerKey: 'tUNZqC9llORsnq4AEmu5',
     eas: {
       projectId: 'b706dc2b-25ad-4809-9dfb-d4fcd6cf1935',

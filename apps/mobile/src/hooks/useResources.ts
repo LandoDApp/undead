@@ -8,6 +8,7 @@ export function useResources() {
   const isGameActive = useGameStore((s) => s.isGameActive);
   const position = useLocationStore((s) => s.position);
   const fetchedRef = useRef(false);
+  const collectingRef = useRef(new Set<string>());
 
   // Fetch balance on game start
   useEffect(() => {
@@ -50,14 +51,20 @@ export function useResources() {
 
     const resources = useResourceStore.getState().resources;
     for (const resource of resources) {
+      if (collectingRef.current.has(resource.id)) continue;
+
       const dist = distanceMeters(position, {
         latitude: resource.latitude,
         longitude: resource.longitude,
       });
       if (dist <= RESOURCE_COLLECT_RADIUS) {
+        collectingRef.current.add(resource.id);
         useResourceStore
           .getState()
-          .collectResource(resource.id, position.latitude, position.longitude);
+          .collectResource(resource.id, position.latitude, position.longitude)
+          .finally(() => {
+            collectingRef.current.delete(resource.id);
+          });
       }
     }
   }, [isGameActive, position]);

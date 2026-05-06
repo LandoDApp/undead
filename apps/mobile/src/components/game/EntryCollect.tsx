@@ -30,8 +30,14 @@ export function EntryCollect({ onDone }: EntryCollectProps) {
 
   const handleCollect = async () => {
     setCollecting(true);
-    await useBastionStore.getState().collectStorage();
+    const ok = await useBastionStore.getState().collectStorage();
     setCollecting(false);
+
+    if (!ok) {
+      // Collect failed — still let user proceed
+      console.warn('[EntryCollect] collect failed, skipping');
+    }
+
     setCollected(true);
 
     // Check if vision needs drawing

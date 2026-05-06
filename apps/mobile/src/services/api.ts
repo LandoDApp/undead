@@ -46,11 +46,13 @@ import { getToken } from './token-storage';
  * In Production → Tunnel-/Cloud-URL aus app.config.ts extra.apiUrl.
  */
 function getApiUrl(): string {
-  if (__DEV__) {
-    return 'http://192.168.178.45:3000';
+  const url = Constants.expoConfig?.extra?.apiUrl;
+
+  if (!url) {
+    throw new Error('API URL missing');
   }
 
-  return Constants.expoConfig?.extra?.apiUrl ?? 'http://192.168.178.45:3000';
+  return url;
 }
 
 const API_URL = getApiUrl();
@@ -171,6 +173,15 @@ export const api = {
       request<{ clan: ClanType }>('/api/player/clan', {
         method: 'POST',
         body: JSON.stringify({ clan }),
+      }),
+
+    getVisibility: () =>
+      request<{ hidden: boolean }>('/api/player/visibility'),
+
+    setVisibility: (hidden: boolean) =>
+      request<{ hidden: boolean }>('/api/player/visibility', {
+        method: 'PUT',
+        body: JSON.stringify({ hidden }),
       }),
   },
 
@@ -410,7 +421,7 @@ export const api = {
 
   steps: {
     report: (steps: number) =>
-      request('/api/player/steps', {
+      request<{ stepsToday: number; totalXp: number }>('/api/player/steps', {
         method: 'POST',
         body: JSON.stringify({ steps }),
       }),

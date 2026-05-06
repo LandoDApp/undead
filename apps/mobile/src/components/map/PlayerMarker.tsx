@@ -1,67 +1,70 @@
-import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import React, { useMemo } from 'react';
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { useLocationStore } from '@/stores/location';
-import { useGameStore } from '@/stores/game';
 import { useAuthStore } from '@/stores/auth';
-import { playerSpriteByClan, sprites } from '@/assets';
-import { colors } from '@/theme';
+import { sprites } from '@/assets';
+import type { ClanType } from '@undead/shared';
+
+const PLAYER_IMAGES = {
+  'player-glut': sprites.playerGlut,
+  'player-frost': sprites.playerFrost,
+  'player-hain': sprites.playerHain,
+};
+
+const CLAN_ICON: Record<ClanType, string> = {
+  glut: 'player-glut',
+  frost: 'player-frost',
+  hain: 'player-hain',
+};
+
+const iconStyle = {
+  iconImage: ['get', 'icon'],
+  iconSize: ['interpolate', ['linear'], ['zoom'], 10, 0.1, 14, 0.3, 16, 0.55, 20, 1.4],
+  iconAllowOverlap: true,
+  iconIgnorePlacement: true,
+  textField: ['get', 'name'],
+  textSize: ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 12, 18, 16],
+  textColor: '#f4e8c1',
+  textHaloColor: '#2f1f14',
+  textHaloWidth: 1.2,
+  textOffset: [0, -2.5] as [number, number],
+  textAnchor: 'bottom' as const,
+  textFont: ['Noto Serif Regular'],
+  textAllowOverlap: true,
+  textIgnorePlacement: true,
+} as const;
 
 export function PlayerMarker() {
   const displayPosition = useLocationStore((s) => s.displayPosition);
   const position = useLocationStore((s) => s.position);
-  const isInCityState = useGameStore((s) => s.isInCityState);
-  const clan = useAuthStore((s) => s.clan);
+  const clan: ClanType | null = useAuthStore((s) => s.clan);
+  const user = useAuthStore((s) => s.user);
 
   const coord = displayPosition ?? position;
-  if (!coord) return null;
+  const iconName = clan ? CLAN_ICON[clan] : 'player-glut';
+  const displayName = user?.displayName ?? '';
 
-  const ringColor = isInCityState ? colors.cityState : colors.player;
-  const playerSprite = clan ? playerSpriteByClan[clan] : sprites.playerGlut;
+  const geojson = useMemo(() => {
+    if (!coord) return { type: 'FeatureCollection' as const, features: [] };
+    return {
+      type: 'FeatureCollection' as const,
+      features: [{
+        type: 'Feature' as const,
+        properties: { icon: iconName, name: displayName },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [coord.longitude, coord.latitude] as [number, number],
+        },
+      }],
+    };
+  }, [coord?.longitude, coord?.latitude, iconName, displayName]);
 
   return (
-    <MapLibreGL.MarkerView
-      coordinate={[coord.longitude, coord.latitude]}
-    >
-      <View style={styles.container}>
-        <View style={[styles.marker, { backgroundColor: ringColor + '40' }, isInCityState && styles.markerSafe]}>
-          <Image
-            source={playerSprite}
-            style={[styles.markerInner, isInCityState && styles.markerInnerSafe]}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
-    </MapLibreGL.MarkerView>
+    <>
+      <MapLibreGL.Images images={PLAYER_IMAGES} />
+      <MapLibreGL.ShapeSource id="player" shape={geojson}>
+        <MapLibreGL.SymbolLayer id="player-icon" style={iconStyle} />
+      </MapLibreGL.ShapeSource>
+    </>
   );
 }
-
-const MARKER_SIZE = 68;
-
-const styles = StyleSheet.create({
-  container: {
-    width: MARKER_SIZE,
-    height: MARKER_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999,
-    elevation: 999,
-  },
-  marker: {
-    width: MARKER_SIZE,
-    height: MARKER_SIZE,
-    borderRadius: MARKER_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerSafe: {
-    backgroundColor: colors.cityState + '40',
-  },
-  markerInner: {
-    width: MARKER_SIZE,
-    height: MARKER_SIZE,
-  },
-  markerInnerSafe: {
-    opacity: 0.9,
-  },
-});

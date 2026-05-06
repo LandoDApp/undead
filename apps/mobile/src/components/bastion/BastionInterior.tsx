@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ImageSourcePropType } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ImageSourcePropType, Alert } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 import { icons, workerSprite, workerIcon } from '@/assets';
 import { useBastionStore } from '@/stores/bastion';
 import { useResourceStore } from '@/stores/resources';
 import {
   BASTION_WORKER_SLOTS,
+  BASTION_MAX_HP,
+  BASTION_UPGRADE_CRYSTAL_COSTS,
+  BASTION_HEAL_HERB_COST,
   WORKER_HERB_RATE,
   WORKER_CRYSTAL_RATE,
   WORKER_SCOUT_RATE,
@@ -21,17 +24,53 @@ const WORKER_INFO: Record<WorkerType, { label: string; rateLabel: string; baseRa
   scout: { label: 'Sp\u00e4her', rateLabel: 'Berichte/h', baseRate: WORKER_SCOUT_RATE },
 };
 
-const STORAGE_ITEMS: { key: 'herbs' | 'crystals' | 'relics' | 'scoutReports'; maxKey: string; label: string; icon: ImageSourcePropType; color: string }[] = [
-  { key: 'herbs', maxKey: 'maxHerbs', label: 'Kr\u00e4uter', icon: icons.herb, color: colors.cityState },
-  { key: 'crystals', maxKey: 'maxCrystals', label: 'Kristalle', icon: icons.crystal, color: '#8e44ad' },
-  { key: 'relics', maxKey: 'maxRelics', label: 'Reliquien', icon: icons.relic, color: colors.gold },
-  { key: 'scoutReports', maxKey: 'maxScoutReports', label: 'Berichte', icon: icons.vision, color: colors.player },
+const STORAGE_ITEMS: { key: 'herbs' | 'crystals' | 'relics' | 'scoutReports'; maxKey: string; label: string; icon: ImageSourcePropType; color: string; workerType: WorkerType | null }[] = [
+  { key: 'herbs', maxKey: 'maxHerbs', label: 'Kr\u00e4uter', icon: icons.herb, color: colors.cityState, workerType: 'herbalist' },
+  { key: 'crystals', maxKey: 'maxCrystals', label: 'Kristalle', icon: icons.crystal, color: '#8e44ad', workerType: 'miner' },
+  { key: 'relics', maxKey: 'maxRelics', label: 'Reliquien', icon: icons.relic, color: colors.gold, workerType: null },
+  { key: 'scoutReports', maxKey: 'maxScoutReports', label: 'Berichte', icon: icons.vision, color: colors.player, workerType: 'scout' },
 ];
 
 const WORKER_TYPES: WorkerType[] = ['herbalist', 'miner', 'scholar', 'scout'];
 
+const WORKER_RATE_MAP: Record<string, number> = {
+  herbalist: WORKER_HERB_RATE,
+  miner: WORKER_CRYSTAL_RATE,
+  scout: WORKER_SCOUT_RATE,
+};
+
 function getWorkerRate(type: WorkerType, level: number): number {
   return WORKER_INFO[type].baseRate * Math.pow(WORKER_LEVEL_MULTIPLIER, level);
+}
+
+function getTotalRateForType(workers: BastionWorker[], workerType: WorkerType | null): number {
+  if (!workerType) return 0;
+  const baseRate = WORKER_RATE_MAP[workerType];
+  if (!baseRate) return 0;
+  return workers
+    .filter((w) => w.type === workerType)
+    .reduce((sum, w) => sum + baseRate * Math.pow(WORKER_LEVEL_MULTIPLIER, w.level), 0);
+}
+
+function formatDuration(hours: number): string {
+  if (hours <= 0) return 'Voll';
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `~${m}m`;
+  if (m === 0) return `~${h}h`;
+  return `~${h}h ${m}m`;
+}
+
+function formatTimeSince(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  if (diff < 60_000) return 'Gerade eben';
+  const minutes = Math.floor(diff / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours === 0) return `vor ${remainingMinutes}m`;
+  if (remainingMinutes === 0) return `vor ${hours}h`;
+  return `vor ${hours}h ${remainingMinutes}m`;
 }
 
 export function BastionInterior() {
@@ -55,10 +94,36 @@ export function BastionInterior() {
 
   const maxSlots = BASTION_WORKER_SLOTS[Math.min(bastion.level, 2)];
   const freeSlots = maxSlots - workers.length;
+  const [collecting, setCollecting] = useState(false);
   const hasStorage = storage && (storage.herbs > 0 || storage.crystals > 0 || storage.relics > 0 || storage.scoutReports > 0);
 
   const handleCollect = async () => {
-    await useBastionStore.getState().collectStorage();
+    setCollecting(true);
+    const ok = await useBastionStore.getState().collectStorage();
+    setCollecting(false);
+    if (!ok) {
+      Alert.alert('Fehler', 'Einsammeln fehlgeschlagen. Pr\u00fcfe deine Verbindung.');
+    }
+  };
+
+  const LEVEL_NAMES = ['Holzh\u00fctte', 'Holzfestung', 'Steinfestung'] as const;
+  const canUpgradeLevel = bastion.level < 2;
+  const upgradeCrystalsCost = canUpgradeLevel ? BASTION_UPGRADE_CRYSTAL_COSTS[bastion.level + 1] : 0;
+  const canUpgrade = canUpgradeLevel && balance.crystals >= upgradeCrystalsCost;
+
+  const healAmount = Math.min(10, bastion.maxHp - bastion.hp);
+  const healHerbsCost = healAmount * BASTION_HEAL_HERB_COST;
+  const canHeal = healAmount > 0 && balance.herbs >= healHerbsCost;
+
+  const hpPercent = Math.round((bastion.hp / bastion.maxHp) * 100);
+  const hpColor = hpPercent > 60 ? colors.cityState : hpPercent > 30 ? '#e67e22' : colors.danger;
+
+  const handleHeal = async () => {
+    await useBastionStore.getState().healBastion(healAmount);
+  };
+
+  const handleUpgrade = async () => {
+    await useBastionStore.getState().upgradeBastion();
   };
 
   const handleAssignWorker = async (type: WorkerType) => {
@@ -76,31 +141,89 @@ export function BastionInterior() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Bastion status + upgrade/heal */}
+      <Text style={styles.sectionTitle}>{LEVEL_NAMES[bastion.level]}</Text>
+      <View style={styles.storageCard}>
+        <Text style={styles.hpLabel}>Stabilit{'\u00e4'}t</Text>
+        <View style={styles.hpBarBg}>
+          <View style={[styles.hpBarFill, { width: `${hpPercent}%`, backgroundColor: hpColor }]} />
+        </View>
+        <Text style={[styles.hpValue, { color: hpColor }]}>
+          {bastion.hp}/{bastion.maxHp}
+        </Text>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, !canHeal && styles.buttonDisabled]}
+            onPress={handleHeal}
+            disabled={!canHeal}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.actionButtonText}>
+              Heilen ({healHerbsCost} Kr{'\u00e4'}uter)
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.upgradeActionBtn, !canUpgrade && styles.buttonDisabled]}
+            onPress={handleUpgrade}
+            disabled={!canUpgrade}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.actionButtonText}>
+              {!canUpgradeLevel ? 'Max Level' : `Upgrade (${upgradeCrystalsCost} Kristalle)`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Storage section */}
       <Text style={styles.sectionTitle}>Lager</Text>
       {storage && (
         <View style={styles.storageCard}>
-          {STORAGE_ITEMS.map((item) => (
-            <StorageBar
-              key={item.key}
-              label={item.label}
-              icon={item.icon}
-              current={(storage as any)[item.key]}
-              max={(storage as any)[item.maxKey]}
-              color={item.color}
-            />
-          ))}
+          {STORAGE_ITEMS.map((item) => {
+            const current = (storage as any)[item.key] as number;
+            const max = (storage as any)[item.maxKey] as number;
+            const rate = getTotalRateForType(workers, item.workerType);
+            let timeLabel: string;
+            if (current >= max) {
+              timeLabel = 'Voll';
+            } else if (rate <= 0) {
+              timeLabel = 'Kein Arbeiter';
+            } else {
+              const hoursToFull = (max - current) / rate;
+              timeLabel = `Voll in ${formatDuration(hoursToFull)}`;
+            }
+            return (
+              <View key={item.key}>
+                <StorageBar
+                  label={item.label}
+                  icon={item.icon}
+                  current={current}
+                  max={max}
+                  color={item.color}
+                />
+                <Text style={styles.storageTimeLabel}>{timeLabel}</Text>
+              </View>
+            );
+          })}
 
           <TouchableOpacity
-            style={[styles.collectButton, !hasStorage && styles.buttonDisabled]}
+            style={[styles.collectButton, (!hasStorage || collecting) && styles.buttonDisabled]}
             onPress={handleCollect}
-            disabled={!hasStorage}
+            disabled={!hasStorage || collecting}
             activeOpacity={0.7}
           >
             <Text style={styles.collectButtonText}>
-              {hasStorage ? 'Einsammeln' : 'Lager leer'}
+              {collecting ? 'Wird eingesammelt...' : hasStorage ? 'Einsammeln' : 'Lager leer'}
             </Text>
           </TouchableOpacity>
+
+          {storage.lastCollectedAt > 0 && (
+            <Text style={styles.lastCollectedText}>
+              Zuletzt gesammelt {formatTimeSince(storage.lastCollectedAt)}
+            </Text>
+          )}
         </View>
       )}
 
@@ -280,6 +403,63 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: fontSize.xs,
     fontFamily: fontFamily.body,
+  },
+  storageTimeLabel: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.body,
+    marginLeft: 28,
+    marginTop: 2,
+  },
+  lastCollectedText: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.body,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  hpLabel: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    fontFamily: fontFamily.body,
+  },
+  hpBarBg: {
+    height: 10,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
+    marginTop: spacing.xs,
+  },
+  hpBarFill: {
+    height: '100%',
+    borderRadius: borderRadius.sm,
+  },
+  hpValue: {
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+    marginTop: spacing.xs,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: colors.cityState,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  upgradeActionBtn: {
+    backgroundColor: '#e67e22',
+  },
+  actionButtonText: {
+    color: colors.text,
+    fontSize: 13,
+    fontFamily: fontFamily.body,
+    fontWeight: '600',
   },
   collectButton: {
     backgroundColor: colors.primary,

@@ -1,41 +1,105 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Image, StyleSheet, Pressable, Animated, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useGameStore } from '@/stores/game';
 import { useLocationStore } from '@/stores/location';
 import { useResourceStore } from '@/stores/resources';
 import { useDailyStore } from '@/stores/daily';
+import { useAuthStore } from '@/stores/auth';
 import { PLAYER_MAX_HITS } from '@undead/shared';
-import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
+import { colors, fontFamily } from '@/theme';
 import { icons } from '@/assets';
+import { FrameView } from '@/components/ui/FrameView';
 import type { GameMapHandle } from '@/components/map/GameMap';
 import { QuestTracker } from '@/components/game/QuestTracker';
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 interface GameHUDProps {
   mapRef: React.RefObject<GameMapHandle | null>;
+  ticker?: string;
 }
 
-export function GameHUD({ mapRef }: GameHUDProps) {
-  const { ghouls, timeOfDay, isInCityState, playerHits, gameMode, isExitingJagd, exitJagdCountdown } =
+const CLAN_LABELS: Record<string, string> = {
+  glut: 'Glut',
+  frost: 'Frost',
+  hain: 'Hain',
+};
+
+const CLAN_COLORS: Record<string, string> = {
+  glut: colors.clanGlut,
+  frost: colors.clanFrost,
+  hain: colors.clanHain,
+};
+
+function getLevel(totalXp: number): number {
+  return Math.max(1, Math.floor(totalXp / 1000) + 1);
+}
+
+function formatDistance(stepsToday: number): string {
+  const km = (stepsToday * 0.7) / 1000;
+  if (km < 0.1) return `${Math.round(stepsToday * 0.7)} m`;
+  return `${km.toFixed(1)} km`;
+}
+
+/* ---- Marquee ticker ---- */
+function TickerBar({ text }: { text: string }) {
+  const scrollX = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+
+  useEffect(() => {
+    const textWidth = text.length * 8 + SCREEN_WIDTH;
+    scrollX.setValue(SCREEN_WIDTH);
+
+    const anim = Animated.loop(
+      Animated.timing(scrollX, {
+        toValue: -text.length * 8,
+        duration: text.length * 110,
+        useNativeDriver: true,
+      }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [text, scrollX]);
+
+  return (
+    <View style={tickerStyles.mask}>
+      <Animated.Text
+        style={[tickerStyles.text, { transform: [{ translateX: scrollX }] }]}
+        numberOfLines={1}
+      >
+        {text}
+      </Animated.Text>
+    </View>
+  );
+}
+
+const tickerStyles = StyleSheet.create({
+  mask: {
+    overflow: 'hidden',
+    height: 26,
+    justifyContent: 'center',
+  },
+  text: {
+    color: '#2f1f14',
+    fontSize: 18,
+    fontFamily: fontFamily.body,
+  },
+});
+
+
+/* ---- Main HUD ---- */
+export function GameHUD({ mapRef, ticker = 'Das ist ein Test \u2014 Willkommen in den Schattenlanden...' }: GameHUDProps) {
+  const insets = useSafeAreaInsets();
+  const { isInCityState, timeOfDay, gameMode, isExitingJagd, exitJagdCountdown, playerHits, stepsToday, totalXp } =
     useGameStore();
-  const motionState = useLocationStore((s) => s.motionState);
   const balance = useResourceStore((s) => s.balance);
   const streak = useDailyStore((s) => s.streak);
-
-  const timeLabel = {
-    day: 'Tag',
-    night: 'Nacht',
-    blackout: 'Ruhezeit',
-  }[timeOfDay];
-
-  const motionLabel = {
-    still: 'Stehen',
-    walking: 'Gehen',
-    running: 'Laufen',
-  }[motionState];
-
-  const activeGhouls = ghouls.filter((g) => !g.frozen).length;
-  const heartsRemaining = PLAYER_MAX_HITS - playerHits;
+  const user = useAuthStore((s) => s.user);
+  const clan = useAuthStore((s) => s.clan);
   const isJagd = gameMode === 'jagd';
+  const heartsRemaining = PLAYER_MAX_HITS - playerHits;
+  const level = getLevel(totalXp);
 
   const handleCenterOnPlayer = () => {
     const pos = useLocationStore.getState().position;
@@ -61,131 +125,122 @@ export function GameHUD({ mapRef }: GameHUDProps) {
           key={i}
           source={icons.heart}
           style={[styles.iconSmall, i >= heartsRemaining && styles.iconDimmed]}
-        />
+        />,
       );
     }
     return hearts;
   };
 
+  const contentPaddingTop = Math.max(insets.top, 20) + 10;
+
   return (
     <View style={styles.overlay} pointerEvents="box-none">
-      {/* Top status bar */}
-      <View style={styles.topBar} pointerEvents="none">
-        <View style={styles.pill}>
-          <View
-            style={[
-              styles.dot,
-              {
-                backgroundColor:
-                  timeOfDay === 'day'
-                    ? colors.warning
-                    : timeOfDay === 'night'
-                    ? colors.primary
-                    : colors.textMuted,
-              },
-            ]}
-          />
-          <Text style={styles.pillText}>{timeLabel}</Text>
-        </View>
+      {/* ===== TOP FRAME ===== */}
+      <View style={styles.mainFrameWrap}>
+        <FrameView variant="light" paddingH={28} paddingTop={contentPaddingTop} paddingBottom={16}>
+          <View style={styles.row1}>
+            <View style={styles.identityCol}>
+              <View style={styles.nameRow}>
+                <Text style={styles.playerName} numberOfLines={1}>
+                  {user?.displayName ?? 'Wanderer'}
+                </Text>
+                <Text style={styles.levelBadge}>Lv.{level}</Text>
+              </View>
+              {clan && (
+                <Text style={[styles.clanText, { color: CLAN_COLORS[clan] ?? '#5a3e1b' }]}>
+                  {CLAN_LABELS[clan] ?? clan}
+                </Text>
+              )}
+            </View>
 
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>{motionLabel}</Text>
-        </View>
-
-        {isJagd && (
-          <View style={styles.pill}>
-            <View style={[styles.dot, { backgroundColor: colors.ghoul }]} />
-            <Text style={styles.pillText}>{activeGhouls}</Text>
-          </View>
-        )}
-
-        <View style={[styles.pill, playerHits > 0 && styles.pillDanger]}>
-          {renderHearts()}
-          <Text style={[styles.pillText, playerHits > 0 && styles.pillTextDanger]}>
-            {heartsRemaining}/{PLAYER_MAX_HITS}
-          </Text>
-        </View>
-
-        <View style={styles.pill}>
-          <Image source={icons.herb} style={styles.iconSmall} />
-          <Text style={styles.pillText}>{balance.herbs}</Text>
-        </View>
-
-        <View style={styles.pill}>
-          <Image source={icons.crystal} style={styles.iconSmall} />
-          <Text style={styles.pillText}>{balance.crystals}</Text>
-        </View>
-
-        {balance.relics > 0 && (
-          <View style={styles.pill}>
-            <Image source={icons.relic} style={styles.iconSmall} />
-            <Text style={styles.pillText}>{balance.relics}</Text>
-          </View>
-        )}
-
-        {streak && streak.currentStreak > 0 && (
-          <View style={styles.pill}>
-            <Image source={icons.streak} style={styles.iconSmall} />
-            <Text style={styles.pillText}>{streak.currentStreak}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Banners */}
-      {isInCityState && (
-        <View style={styles.cityStateBanner} pointerEvents="none">
-          <Image source={icons.shield} style={styles.iconSmall} />
-          <Text style={styles.cityStateText}>Stadtstaat {'\u2014'} Ghoule gebannt</Text>
-        </View>
-      )}
-
-      {timeOfDay === 'blackout' && (
-        <View style={styles.blackoutBanner} pointerEvents="none">
-          <Text style={styles.blackoutText}>Ruhezeit (23:00 - 06:00) {'\u2014'} Keine Ghoule</Text>
-        </View>
-      )}
-
-      {/* Quest Tracker */}
-      <QuestTracker />
-
-      {/* Bottom action buttons */}
-      <View style={styles.bottomButtons}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleCenterOnPlayer} activeOpacity={0.7}>
-          <Image source={icons.shield} style={styles.iconMed} />
-        </TouchableOpacity>
-
-        {/* Jagd / Fliehen button */}
-        <TouchableOpacity
-          style={[
-            styles.jagdButton,
-            isJagd && styles.jagdButtonActive,
-            isExitingJagd && styles.jagdButtonExiting,
-          ]}
-          onPress={handleJagdToggle}
-          activeOpacity={0.7}
-          disabled={isExitingJagd}
-        >
-          {isExitingJagd ? (
-            <View style={styles.jagdExitContent}>
-              <Text style={styles.jagdExitText}>Du entkommst...</Text>
-              <View style={styles.jagdExitBarBg}>
-                <View
-                  style={[
-                    styles.jagdExitBarFill,
-                    { width: `${((3 - exitJagdCountdown) / 3) * 100}%` },
-                  ]}
-                />
+            <View style={styles.statsCol}>
+              <View style={styles.heartsRow}>{renderHearts()}</View>
+              <View style={styles.resourceRow}>
+                <Image source={icons.herb} style={styles.iconTiny} />
+                <Text style={styles.statVal}>{balance.herbs}</Text>
+                <Image source={icons.crystal} style={styles.iconTiny} />
+                <Text style={styles.statVal}>{balance.crystals}</Text>
+                {balance.relics > 0 && (
+                  <>
+                    <Image source={icons.relic} style={styles.iconTiny} />
+                    <Text style={styles.statVal}>{balance.relics}</Text>
+                  </>
+                )}
               </View>
             </View>
-          ) : (
-            <View style={styles.jagdButtonRow}>
-              <Image source={isJagd ? icons.flee : icons.sword} style={styles.iconSmall} />
-              <Text style={styles.jagdButtonText}>
-                {isJagd ? 'Fliehen' : 'Jagd'}
-              </Text>
+
+            <View style={styles.buttonsCol}>
+              <Pressable style={styles.iconButton} onPress={() => router.push('/(game)/bastion')}>
+                <Image source={icons.shield} style={styles.iconMed} />
+              </Pressable>
+              <Pressable style={styles.iconButton} onPress={handleCenterOnPlayer}>
+                <Image source={icons.vision} style={styles.iconMed} />
+              </Pressable>
+              <Pressable style={styles.iconButton} onPress={() => router.push('/(game)/profile')}>
+                <Text style={styles.menuIcon}>{'\u2630'}</Text>
+              </Pressable>
             </View>
-          )}
-        </TouchableOpacity>
+          </View>
+
+          <View style={styles.row2}>
+            {streak && streak.currentStreak > 0 && (
+              <View style={styles.chip}>
+                <Image source={icons.streak} style={styles.iconTiny} />
+                <Text style={styles.chipText}>{streak.currentStreak}d</Text>
+              </View>
+            )}
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>{formatDistance(stepsToday)}</Text>
+            </View>
+            {isInCityState && (
+              <View style={styles.chip}>
+                <Image source={icons.shield} style={styles.iconTiny} />
+                <Text style={styles.chipText}>Stadtstaat</Text>
+              </View>
+            )}
+            {timeOfDay === 'blackout' && (
+              <View style={styles.chip}>
+                <Text style={styles.chipText}>Ruhezeit</Text>
+              </View>
+            )}
+          </View>
+
+          <QuestTracker />
+        </FrameView>
+      </View>
+
+      {/* ===== BOTTOM AREA: Jagd button flush above chat bar ===== */}
+      <View style={styles.bottomArea} pointerEvents="box-none">
+        <View style={styles.jagdRow}>
+          <Pressable onPress={handleJagdToggle} disabled={isExitingJagd}>
+            <FrameView variant="gold" paddingH={24} paddingTop={18} paddingBottom={18}>
+              {isExitingJagd ? (
+                <View style={styles.jagdExitContent}>
+                  <Text style={styles.jagdExitText}>Du entkommst...</Text>
+                  <View style={styles.jagdExitBarBg}>
+                    <View
+                      style={[
+                        styles.jagdExitBarFill,
+                        { width: `${((3 - exitJagdCountdown) / 3) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.jagdButtonRow}>
+                  <Image source={isJagd ? icons.flee : icons.sword} style={styles.iconLg} />
+                  <Text style={styles.jagdButtonText}>
+                    {isJagd ? 'Fliehen' : 'Jagd'}
+                  </Text>
+                </View>
+              )}
+            </FrameView>
+          </Pressable>
+        </View>
+
+        <FrameView variant="light" paddingH={28} paddingTop={12} paddingBottom={Math.max(insets.bottom, 6) + 4}>
+          <TickerBar text={ticker} />
+        </FrameView>
       </View>
     </View>
   );
@@ -196,162 +251,167 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 10,
   },
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    paddingTop: spacing.xxl + spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.parchment + 'E0',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.gold + '30',
-    gap: spacing.xs,
-  },
-  pillDanger: {
-    borderWidth: 1,
-    borderColor: colors.danger,
-  },
-  pillText: {
-    color: colors.text,
-    fontSize: 14,
-    fontFamily: fontFamily.body,
-  },
-  pillTextDanger: {
-    color: colors.danger,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  iconTiny: {
+    width: 14,
+    height: 14,
   },
   iconSmall: {
     width: 16,
     height: 16,
   },
+  iconMed: {
+    width: 20,
+    height: 20,
+  },
+  iconLg: {
+    width: 30,
+    height: 30,
+  },
   iconDimmed: {
     opacity: 0.25,
   },
-  iconMed: {
-    width: 24,
-    height: 24,
-  },
-  // Banners
-  cityStateBanner: {
+
+  // Top frame
+  mainFrameWrap: {
     position: 'absolute',
-    top: spacing.xxl + spacing.md + 48,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.cityState + '20',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.cityState,
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  row1: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
-  cityStateText: {
-    color: colors.cityState,
-    fontSize: 14,
+  identityCol: {
+    flex: 1,
+    marginRight: 8,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  playerName: {
+    color: '#2f1f14',
+    fontSize: 13,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  levelBadge: {
+    color: '#5a3e1b',
+    fontSize: 11,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+  },
+  clanText: {
+    fontSize: 11,
     fontFamily: fontFamily.body,
     fontWeight: '600',
   },
-  blackoutBanner: {
-    position: 'absolute',
-    top: spacing.xxl + spacing.md + 48,
-    left: spacing.lg,
-    right: spacing.lg,
-    backgroundColor: colors.surfaceLight + 'E0',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+  statsCol: {
     alignItems: 'center',
+    marginHorizontal: 6,
   },
-  blackoutText: {
-    color: colors.textSecondary,
+  heartsRow: {
+    flexDirection: 'row',
+    gap: 2,
+    marginBottom: 2,
+  },
+  resourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  statVal: {
+    color: '#2f1f14',
     fontSize: 14,
     fontFamily: fontFamily.body,
+    marginRight: 4,
   },
-  // Bottom buttons
-  bottomButtons: {
-    position: 'absolute',
-    bottom: spacing.xxl + spacing.md,
-    right: spacing.md,
-    gap: spacing.sm,
-    alignItems: 'flex-end',
+  buttonsCol: {
+    flexDirection: 'row',
+    gap: 6,
   },
-  actionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.parchment + 'E0',
+  iconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.gold + '30',
   },
-  jagdButton: {
-    backgroundColor: colors.danger,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.gold + '40',
-    minWidth: 100,
+  menuIcon: {
+    color: '#2f1f14',
+    fontSize: 16,
+    fontFamily: fontFamily.body,
+  },
+  row2: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    flexWrap: 'wrap',
   },
-  jagdButtonActive: {
-    backgroundColor: colors.warning,
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    backgroundColor: '#2f1f140d',
+    borderRadius: 3,
   },
-  jagdButtonExiting: {
-    backgroundColor: colors.surfaceLight,
-    opacity: 0.9,
+  chipText: {
+    color: '#5a3e1b',
+    fontSize: 12,
+    fontFamily: fontFamily.body,
+    fontWeight: '600',
+  },
+
+  // Bottom area — Jagd button flush above chat bar
+  bottomArea: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  jagdRow: {
+    alignItems: 'flex-end',
+    marginRight: -4,
   },
   jagdButtonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
+    gap: 10,
   },
   jagdButtonText: {
-    color: colors.text,
-    fontSize: 14,
+    color: '#2f1f14',
+    fontSize: 22,
     fontFamily: fontFamily.body,
     fontWeight: '700',
   },
   jagdExitContent: {
     alignItems: 'center',
-    gap: spacing.xs,
-    minWidth: 120,
+    gap: 6,
+    minWidth: 130,
   },
   jagdExitText: {
-    color: colors.textSecondary,
-    fontSize: 12,
+    color: '#5a3e1b',
+    fontSize: 15,
     fontFamily: fontFamily.body,
   },
   jagdExitBarBg: {
     width: '100%',
-    height: 4,
-    backgroundColor: colors.background,
-    borderRadius: 2,
+    height: 6,
+    backgroundColor: '#d4a80a40',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   jagdExitBarFill: {
     height: '100%',
-    backgroundColor: colors.warning,
-    borderRadius: 2,
+    backgroundColor: '#d4a80a',
+    borderRadius: 3,
   },
 });

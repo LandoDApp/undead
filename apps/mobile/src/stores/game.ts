@@ -17,6 +17,10 @@ interface GameState {
   gameMode: GameMode;
   isExitingJagd: boolean;
   exitJagdCountdown: number;
+  // Steps / XP
+  stepsToday: number;
+  totalXp: number;
+  setStepsData: (stepsToday: number, totalXp: number) => void;
   setGameMode: (mode: GameMode) => void;
   setGhouls: (ghouls: GhoulState[]) => void;
   updateGhoul: (id: string, update: Partial<GhoulState>) => void;
@@ -52,6 +56,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   gameMode: 'wandel',
   isExitingJagd: false,
   exitJagdCountdown: 0,
+  stepsToday: 0,
+  totalXp: 0,
+
+  setStepsData: (stepsToday, totalXp) => set({ stepsToday, totalXp }),
 
   setGameMode: (gameMode) => set({ gameMode }),
 
