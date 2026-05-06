@@ -28,7 +28,8 @@ export function useResources() {
   useEffect(() => {
     if (!isGameActive || !position || fetchedRef.current) return;
     fetchedRef.current = true;
-    useResourceStore.getState().fetchNearby(position.latitude, position.longitude);
+    const mode = useGameStore.getState().gameMode;
+    useResourceStore.getState().fetchNearby(position.latitude, position.longitude, mode);
   }, [isGameActive, position]);
 
   // Periodic sync
@@ -39,7 +40,8 @@ export function useResources() {
       const pos = useLocationStore.getState().position;
       const active = useGameStore.getState().isGameActive;
       if (!active || !pos) return;
-      useResourceStore.getState().fetchNearby(pos.latitude, pos.longitude);
+      const mode = useGameStore.getState().gameMode;
+      useResourceStore.getState().fetchNearby(pos.latitude, pos.longitude, mode);
     }, RESOURCE_SYNC_INTERVAL);
 
     return () => clearInterval(interval);

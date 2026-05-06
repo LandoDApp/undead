@@ -6,7 +6,7 @@ interface ResourcesState {
   resources: Resource[];
   balance: ResourceBalance;
   setResources: (resources: Resource[]) => void;
-  fetchNearby: (lat: number, lon: number) => Promise<void>;
+  fetchNearby: (lat: number, lon: number, gameMode?: string) => Promise<void>;
   collectResource: (resourceId: string, playerLat: number, playerLon: number) => Promise<boolean>;
   fetchBalance: () => Promise<void>;
   setBalance: (balance: ResourceBalance) => void;
@@ -27,8 +27,8 @@ export const useResourceStore = create<ResourcesState>((set) => ({
 
   setResources: (resources) => set({ resources }),
 
-  fetchNearby: async (lat, lon) => {
-    const res = await api.resources.nearby(lat, lon);
+  fetchNearby: async (lat, lon, gameMode?) => {
+    const res = await api.resources.nearby(lat, lon, gameMode);
     if (res.success && res.data) {
       set({ resources: res.data.resources });
     }

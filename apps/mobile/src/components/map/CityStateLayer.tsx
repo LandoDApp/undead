@@ -2,6 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import MapLibreGL from '@maplibre/maplibre-react-native';
 import { useCityStateStore } from '@/stores/zone';
 import { pointAtDistance } from '@undead/shared';
+import { sprites } from '@/assets';
 
 /** Generate a polygon ring (64 points) approximating a circle */
 function createCirclePolygon(
@@ -17,6 +18,12 @@ function createCirclePolygon(
   }
   return points;
 }
+
+const CLAN_IMAGES = {
+  'cs-glut': sprites.citystateGlut,
+  'cs-frost': sprites.citystateFrost,
+  'cs-hain': sprites.citystateHain,
+};
 
 const extrusionStyle = {
   fillExtrusionColor: [
@@ -51,6 +58,14 @@ const labelStyle = {
   textRotate: 2,
   textOpacity: 0.93,
   textAnchor: 'center',
+} as const;
+
+const clanIconStyle = {
+  iconImage: ['get', 'clanIcon'],
+  iconSize: ['interpolate', ['linear'], ['zoom'], 10, 0.08, 14, 0.25, 16, 0.45, 20, 1.0],
+  iconAllowOverlap: true,
+  iconIgnorePlacement: true,
+  iconOffset: [0, -30] as [number, number],
 } as const;
 
 interface CityStateLayerProps {
@@ -119,6 +134,26 @@ export function CityStateLayer({ onZonePress }: CityStateLayerProps) {
     };
   }, [cityStates]);
 
+  // Clan icon GeoJSON — only zones with a dominantClan
+  const clanGeoJson = useMemo(() => {
+    const withClan = cityStates.filter((z) => z.dominantClan && !z.isFallen);
+    if (withClan.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: withClan.map((zone) => ({
+        type: 'Feature' as const,
+        properties: {
+          id: zone.id,
+          clanIcon: `cs-${zone.dominantClan}`,
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [zone.longitude, zone.latitude] as [number, number],
+        },
+      })),
+    };
+  }, [cityStates]);
+
   const handlePress = useCallback(
     (event: any) => {
       if (!onZonePress) return;
@@ -143,6 +178,7 @@ export function CityStateLayer({ onZonePress }: CityStateLayerProps) {
 
   return (
     <>
+      <MapLibreGL.Images images={CLAN_IMAGES} />
       <MapLibreGL.ShapeSource
         id="city-states"
         shape={geojson}
@@ -158,6 +194,15 @@ export function CityStateLayer({ onZonePress }: CityStateLayerProps) {
           minZoomLevel={14}
         />
       </MapLibreGL.ShapeSource>
+      {clanGeoJson && (
+        <MapLibreGL.ShapeSource id="city-state-clan-icons" shape={clanGeoJson}>
+          <MapLibreGL.SymbolLayer
+            id="city-state-clan-icon-layer"
+            style={clanIconStyle}
+            minZoomLevel={12}
+          />
+        </MapLibreGL.ShapeSource>
+      )}
     </>
   );
 }

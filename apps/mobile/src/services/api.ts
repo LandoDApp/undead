@@ -250,8 +250,8 @@ export const api = {
   },
 
   resources: {
-    nearby: (lat: number, lon: number) =>
-      request<ResourcesNearbyResponse>(`/api/resources/nearby?lat=${lat}&lon=${lon}`),
+    nearby: (lat: number, lon: number, gameMode?: string) =>
+      request<ResourcesNearbyResponse>(`/api/resources/nearby?lat=${lat}&lon=${lon}${gameMode ? `&gameMode=${gameMode}` : ''}`),
 
     collect: (resourceId: string, playerLat: number, playerLon: number) =>
       request<CollectResourceResponse>('/api/resources/collect', {

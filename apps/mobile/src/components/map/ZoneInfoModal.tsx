@@ -6,7 +6,7 @@ import { useCityStateStore } from '@/stores/zone';
 import { api } from '@/services/api';
 import {
   ZONE_MAX_LEVEL,
-  CITY_STATE_HEAL_HERBS_PER_HP,
+  CITY_STATE_HEAL_RELICS_PER_HP,
   CITY_STATE_UPGRADE_CRYSTAL_COSTS,
 } from '@undead/shared';
 
@@ -39,8 +39,8 @@ export function ZoneInfoModal({ zone, onClose }: ZoneInfoModalProps) {
     chargePercent > 60 ? colors.cityState : chargePercent > 30 ? colors.warning : colors.danger;
 
   const healAmount = 10;
-  const herbsCost = healAmount * CITY_STATE_HEAL_HERBS_PER_HP;
-  const canHeal = !zone.isFallen && zone.charge < maxCharge && balance.herbs >= herbsCost;
+  const relicsCost = healAmount * CITY_STATE_HEAL_RELICS_PER_HP;
+  const canHeal = !zone.isFallen && zone.charge < maxCharge && balance.relics >= relicsCost;
 
   const canUpgrade =
     !zone.isFallen &&
@@ -123,7 +123,7 @@ export function ZoneInfoModal({ zone, onClose }: ZoneInfoModalProps) {
               activeOpacity={0.7}
             >
               <Text style={styles.actionButtonText}>
-                Heilen ({herbsCost} Kr{'\u00e4'}uter)
+                Heilen ({relicsCost} Relikte)
               </Text>
             </TouchableOpacity>
 
