@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { GhoulState, TimeOfDay, GhoulCatchResponse, GameMode } from '@undead/shared';
 import { PLAYER_MAX_HITS } from '@undead/shared';
 import { api } from '@/services/api';
+import { useResourceStore } from './resources';
 
 interface GameState {
   ghouls: GhoulState[];
@@ -107,6 +108,10 @@ export const useGameStore = create<GameState>((set, get) => ({
           clearInterval(exitJagdTimer);
           exitJagdTimer = null;
         }
+        // Clear relics from local store (relics only visible in Jagd, expire naturally on server)
+        const resources = useResourceStore.getState().resources;
+        useResourceStore.getState().setResources(resources.filter((r) => r.type !== 'relic'));
+
         set({
           gameMode: 'wandel',
           isExitingJagd: false,

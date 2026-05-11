@@ -21,7 +21,11 @@ import { useBastion } from '@/hooks/useBastion';
 import { usePositionSmoothing } from '@/hooks/usePositionSmoothing';
 import { useQuests } from '@/hooks/useQuests';
 import { usePedometer } from '@/hooks/usePedometer';
+import { useChests } from '@/hooks/useChests';
+import { useDungeons } from '@/hooks/useDungeons';
 import { useAudio } from '@/hooks/useAudio';
+import { DungeonCombat } from '@/components/game/DungeonCombat';
+import { useDungeonStore } from '@/stores/dungeon';
 import { colors } from '@/theme';
 
 type EntryState = 'checking' | 'onboarding' | 'entry_collect' | 'done';
@@ -41,7 +45,11 @@ export default function MapScreen() {
   useBastion();
   useQuests();
   usePedometer();
+  useChests();
+  useDungeons();
   useAudio();
+
+  const inDungeonCombat = useDungeonStore((s) => s.inCombat || s.ejected);
 
   useEffect(() => {
     (async () => {
@@ -79,8 +87,9 @@ export default function MapScreen() {
       <ParchmentOverlay />
       <FogOverlay />
       <VignetteOverlay />
-      <GameHUD mapRef={mapRef} ticker="Willkommen in den Schattenlanden \u2014 Halte deine Bastion stark und sammle Ressourcen bevor die Nacht hereinbricht..." />
+      <GameHUD mapRef={mapRef} chatMessage="Willkommen, Wanderer..." />
       <AttackOverlay />
+      {inDungeonCombat && <DungeonCombat />}
       {entryState === 'onboarding' && (
         <OnboardingTutorial onComplete={handleOnboardingComplete} />
       )}

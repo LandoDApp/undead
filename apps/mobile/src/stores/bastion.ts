@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Bastion, BastionWorker, BastionStorage, ResourceBalance, WorkerType } from '@undead/shared';
+import type { Bastion, BastionWorker, BastionStorage, Dungeon, ResourceBalance, WorkerType } from '@undead/shared';
 import { api } from '@/services/api';
 import { useResourceStore } from './resources';
 
@@ -19,6 +19,7 @@ interface BastionState {
   assignWorker: (workerType: WorkerType) => Promise<boolean>;
   removeWorker: (workerId: string) => Promise<boolean>;
   upgradeWorker: (workerId: string) => Promise<boolean>;
+  useReport: () => Promise<Dungeon | null>;
 }
 
 export const useBastionStore = create<BastionState>((set) => ({
@@ -140,5 +141,20 @@ export const useBastionStore = create<BastionState>((set) => ({
       return true;
     }
     return false;
+  },
+
+  useReport: async () => {
+    const res = await api.bastion.useReport();
+    if (res.success && res.data) {
+      // Decrement local storage count
+      set((s) => ({
+        storage: s.storage ? {
+          ...s.storage,
+          scoutReports: Math.max(0, s.storage.scoutReports - 1),
+        } : null,
+      }));
+      return res.data.dungeon;
+    }
+    return null;
   },
 }));

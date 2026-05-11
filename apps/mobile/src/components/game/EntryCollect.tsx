@@ -12,21 +12,19 @@ interface EntryCollectProps {
 
 export function EntryCollect({ onDone }: EntryCollectProps) {
   const storage = useBastionStore((s) => s.storage);
-  const vision = useDailyStore((s) => s.vision);
   const streak = useDailyStore((s) => s.streak);
   const [collecting, setCollecting] = useState(false);
   const [collected, setCollected] = useState(false);
   const [showVision, setShowVision] = useState(false);
 
   useEffect(() => {
-    // Fetch idle state & streak on mount
+    // Fetch idle state, check-in streak, fetch vision on mount
     useBastionStore.getState().fetchIdleState();
-    useDailyStore.getState().fetchStreak();
+    useDailyStore.getState().checkinStreak();
     useDailyStore.getState().fetchVision();
   }, []);
 
-  const hasStorage = storage && (storage.herbs > 0 || storage.crystals > 0 || storage.relics > 0 || storage.scoutReports > 0);
-  const hasNoVision = !vision;
+  const hasStorage = storage && (storage.herbs > 0 || storage.crystals > 0 || storage.relics > 0 || storage.xp > 0 || storage.scoutReports > 0);
 
   const handleCollect = async () => {
     setCollecting(true);
@@ -40,10 +38,8 @@ export function EntryCollect({ onDone }: EntryCollectProps) {
 
     setCollected(true);
 
-    // Check if vision needs drawing
-    if (hasNoVision) {
-      setShowVision(true);
-    }
+    // Always show vision card after collecting
+    setShowVision(true);
   };
 
   const handleVisionClose = () => {
@@ -52,11 +48,8 @@ export function EntryCollect({ onDone }: EntryCollectProps) {
   };
 
   const handleSkip = () => {
-    if (hasNoVision) {
-      setShowVision(true);
-    } else {
-      onDone();
-    }
+    // Always show vision card
+    setShowVision(true);
   };
 
   // Trigger parent update after render to avoid setState-in-render warnings
@@ -103,6 +96,12 @@ export function EntryCollect({ onDone }: EntryCollectProps) {
                 <Text style={styles.storageLine}>{storage.relics} Reliquien</Text>
               </View>
             )}
+            {storage.xp > 0 && (
+              <View style={styles.storageRow}>
+                <Text style={[styles.storageIcon, { fontSize: 14, textAlign: 'center' }]}>XP</Text>
+                <Text style={styles.storageLine}>{storage.xp} Erfahrung</Text>
+              </View>
+            )}
             {storage.scoutReports > 0 && (
               <View style={styles.storageRow}>
                 <Image source={icons.vision} style={styles.storageIcon} />
@@ -129,7 +128,7 @@ export function EntryCollect({ onDone }: EntryCollectProps) {
           </View>
         )}
 
-        <TouchableOpacity style={styles.skipButton} onPress={hasStorage ? handleSkip : onDone} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkip} activeOpacity={0.7}>
           <Text style={styles.skipText}>
             {hasStorage ? '\u00dcberspringen' : 'Weiter'}
           </Text>

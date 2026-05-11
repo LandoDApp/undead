@@ -1,14 +1,28 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Image, ActivityIndicator } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 import { useResourceStore } from '@/stores/resources';
 import { useCityStateStore } from '@/stores/zone';
 import { api } from '@/services/api';
+import { clanEmblem } from '@/assets';
 import {
   ZONE_MAX_LEVEL,
   CITY_STATE_HEAL_RELICS_PER_HP,
   CITY_STATE_UPGRADE_CRYSTAL_COSTS,
 } from '@undead/shared';
+import type { CityStateReputation, ClanType } from '@undead/shared';
+
+const CLAN_NAMES: Record<string, string> = {
+  glut: 'Glut',
+  frost: 'Frost',
+  hain: 'Hain',
+};
+
+const CLAN_COLORS: Record<string, string> = {
+  glut: colors.clanGlut,
+  frost: colors.clanFrost,
+  hain: colors.clanHain,
+};
 
 interface ZoneInfo {
   id: string;
@@ -19,6 +33,7 @@ interface ZoneInfo {
   maxCharge?: number;
   upgradeLevel?: number;
   baseRadius?: number;
+  dominantClan?: string | null;
 }
 
 interface ZoneInfoModalProps {
@@ -29,6 +44,25 @@ interface ZoneInfoModalProps {
 export function ZoneInfoModal({ zone, onClose }: ZoneInfoModalProps) {
   const balance = useResourceStore((s) => s.balance);
   const fetchCityStates = useCityStateStore((s) => s.fetchCityStates);
+  const [reputation, setReputation] = useState<CityStateReputation | null>(null);
+  const [totalKeys, setTotalKeys] = useState<number>(0);
+  const [loadingRep, setLoadingRep] = useState(false);
+
+  // Fetch key reputation when modal opens
+  useEffect(() => {
+    if (!zone) {
+      setReputation(null);
+      return;
+    }
+    setLoadingRep(true);
+    api.keys.get().then((res) => {
+      if (res.success && res.data) {
+        const match = res.data.reputation.find((r) => r.zoneId === zone.id);
+        setReputation(match ?? null);
+        setTotalKeys(res.data.keys);
+      }
+    }).finally(() => setLoadingRep(false));
+  }, [zone?.id]);
 
   if (!zone) return null;
 
@@ -48,6 +82,10 @@ export function ZoneInfoModal({ zone, onClose }: ZoneInfoModalProps) {
     zone.charge >= maxCharge;
   const crystalsCost = upgradeLevel < ZONE_MAX_LEVEL ? CITY_STATE_UPGRADE_CRYSTAL_COSTS[upgradeLevel] : 0;
   const hasUpgradeCrystals = balance.crystals >= crystalsCost;
+
+  const clanKey = zone.dominantClan as ClanType | undefined;
+  const clanColor = clanKey ? CLAN_COLORS[clanKey] : null;
+  const clanName = clanKey ? CLAN_NAMES[clanKey] : null;
 
   const handleHeal = async () => {
     const res = await api.cityStates.heal(zone.id, healAmount);
@@ -101,6 +139,17 @@ export function ZoneInfoModal({ zone, onClose }: ZoneInfoModalProps) {
             </View>
           </View>
 
+          {/* Dominant Clan Badge */}
+          {clanKey && clanColor && clanName && (
+            <View style={[styles.clanRow, { borderColor: clanColor + '40' }]}>
+              <Image source={clanEmblem[clanKey]} style={styles.clanEmblem} />
+              <View>
+                <Text style={[styles.clanLabel, { color: clanColor }]}>Clan {clanName}</Text>
+                <Text style={styles.clanSub}>Dominanter Clan</Text>
+              </View>
+            </View>
+          )}
+
           <Text style={styles.chargeLabel}>Ladung</Text>
           <View style={styles.chargeBarBg}>
             <View
@@ -113,6 +162,31 @@ export function ZoneInfoModal({ zone, onClose }: ZoneInfoModalProps) {
           <Text style={[styles.chargeValue, { color: chargeColor }]}>
             {zone.charge}/{maxCharge} ({chargePercent}%)
           </Text>
+
+          {/* Key Reputation Section */}
+          <View style={styles.keySection}>
+            <Text style={styles.keySectionTitle}>Reputation</Text>
+            {loadingRep ? (
+              <ActivityIndicator size="small" color={colors.gold} />
+            ) : reputation ? (
+              <View style={styles.keyRows}>
+                <View style={styles.keyRow}>
+                  <Text style={styles.keyLabel}>Besuche</Text>
+                  <Text style={styles.keyValue}>{reputation.visits}</Text>
+                </View>
+                <View style={styles.keyRow}>
+                  <Text style={styles.keyLabel}>Heilungen</Text>
+                  <Text style={styles.keyValue}>{reputation.healsGiven}</Text>
+                </View>
+                <View style={styles.keyRow}>
+                  <Text style={styles.keyLabel}>Schl{'\u00fc'}ssel/Tag</Text>
+                  <Text style={[styles.keyValue, { color: colors.gold }]}>{reputation.keysPerDay}</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.keyNone}>Noch keine Interaktion</Text>
+            )}
+          </View>
 
           {/* Action buttons */}
           <View style={styles.actionRow}>
@@ -191,7 +265,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -228,6 +302,32 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.body,
     fontWeight: '600',
   },
+  // Clan badge
+  clanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.parchmentLight,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  clanEmblem: {
+    width: 28,
+    height: 28,
+  },
+  clanLabel: {
+    fontSize: 16,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+  },
+  clanSub: {
+    fontSize: 12,
+    fontFamily: fontFamily.body,
+    color: colors.textMuted,
+  },
   chargeLabel: {
     color: colors.textSecondary,
     fontSize: 14,
@@ -249,7 +349,48 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontFamily: fontFamily.body,
     fontWeight: '700',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  // Key reputation section
+  keySection: {
+    backgroundColor: colors.parchmentLight,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.gold + '30',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  keySectionTitle: {
+    color: colors.gold,
+    fontSize: 14,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  keyRows: {
+    gap: spacing.xs,
+  },
+  keyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  keyLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontFamily: fontFamily.body,
+  },
+  keyValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+  },
+  keyNone: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontFamily: fontFamily.body,
+    fontStyle: 'italic',
   },
   actionRow: {
     flexDirection: 'row',

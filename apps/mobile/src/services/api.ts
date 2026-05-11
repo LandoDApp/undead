@@ -38,6 +38,18 @@ import type {
   DailyStreak,
   DailyVision,
   ClanType,
+  ChestsNearbyResponse,
+  OpenChestResponse,
+  LootItem,
+  PlayerEquipment,
+  EquipResponse,
+  EquipSlot,
+  PlayerKeysResponse,
+  Dungeon,
+  DungeonListResponse,
+  DungeonEnterResponse,
+  DungeonTapResponse,
+  DungeonStatusResponse,
 } from '@undead/shared';
 import { getToken } from './token-storage';
 
@@ -261,6 +273,12 @@ export const api = {
 
     getBalance: () =>
       request<ResourceBalance>('/api/resources/balance'),
+
+    cleanupRelics: (lat: number, lon: number) =>
+      request<{ deleted: number }>('/api/resources/cleanup-relics', {
+        method: 'POST',
+        body: JSON.stringify({ lat, lon }),
+      }),
   },
 
   /** @deprecated Use resources instead */
@@ -387,6 +405,11 @@ export const api = {
       request<BastionWorkerUpgradeResponse>(`/api/bastion/workers/${workerId}/upgrade`, {
         method: 'POST',
       }),
+
+    useReport: () =>
+      request<{ dungeon: Dungeon }>('/api/bastion/use-report', {
+        method: 'POST',
+      }),
   },
 
   quests: {
@@ -402,6 +425,11 @@ export const api = {
   streak: {
     get: () =>
       request<DailyStreak>('/api/player/streak'),
+
+    checkin: () =>
+      request<DailyStreak>('/api/player/streak/checkin', {
+        method: 'POST',
+      }),
 
     useFreeze: () =>
       request<DailyStreak>('/api/player/streak/freeze', {
@@ -430,6 +458,68 @@ export const api = {
   legal: {
     getPage: (slug: string) =>
       request<LegalPage>(`/api/legal/${slug}`),
+  },
+
+  chests: {
+    nearby: (lat: number, lon: number, gameMode?: string) =>
+      request<ChestsNearbyResponse>(`/api/chests/nearby?lat=${lat}&lon=${lon}${gameMode ? `&gameMode=${gameMode}` : ''}`),
+
+    open: (chestId: string, playerLat: number, playerLon: number) =>
+      request<OpenChestResponse>('/api/chests/open', {
+        method: 'POST',
+        body: JSON.stringify({ chestId, playerLat, playerLon }),
+      }),
+  },
+
+  equipment: {
+    getAll: () =>
+      request<{ items: LootItem[]; equipment: PlayerEquipment }>('/api/equipment'),
+
+    equip: (itemId: string) =>
+      request<EquipResponse>('/api/equipment/equip', {
+        method: 'POST',
+        body: JSON.stringify({ itemId }),
+      }),
+
+    unequip: (slot: EquipSlot) =>
+      request<EquipResponse>('/api/equipment/unequip', {
+        method: 'POST',
+        body: JSON.stringify({ slot }),
+      }),
+  },
+
+  keys: {
+    get: () =>
+      request<PlayerKeysResponse>('/api/keys'),
+  },
+
+  dungeons: {
+    getAll: () =>
+      request<DungeonListResponse>('/api/dungeons'),
+
+    enter: (dungeonId: string, playerLat?: number, playerLon?: number) =>
+      request<DungeonEnterResponse>(`/api/dungeons/${dungeonId}/enter`, {
+        method: 'POST',
+        body: JSON.stringify({ playerLat, playerLon }),
+      }),
+
+    tap: (dungeonId: string) =>
+      request<DungeonTapResponse>(`/api/dungeons/${dungeonId}/tap`, {
+        method: 'POST',
+      }),
+
+    tick: (dungeonId: string) =>
+      request<DungeonTapResponse>(`/api/dungeons/${dungeonId}/tick`, {
+        method: 'POST',
+      }),
+
+    status: (dungeonId: string) =>
+      request<DungeonStatusResponse>(`/api/dungeons/${dungeonId}/status`),
+
+    exit: (dungeonId: string) =>
+      request(`/api/dungeons/${dungeonId}/exit`, {
+        method: 'POST',
+      }),
   },
 
   dev: {

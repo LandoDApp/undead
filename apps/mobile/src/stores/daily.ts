@@ -24,8 +24,7 @@ export const useDailyStore = create<DailyState>((set) => ({
   },
 
   checkinStreak: async () => {
-    // Streak check-in uses a different endpoint pattern
-    const res = await api.streak.get();
+    const res = await api.streak.checkin();
     if (res.success && res.data) {
       set({ streak: res.data });
     }

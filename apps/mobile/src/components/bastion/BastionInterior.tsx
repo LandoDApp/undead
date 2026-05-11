@@ -4,6 +4,7 @@ import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 import { icons, workerSprite, workerIcon } from '@/assets';
 import { useBastionStore } from '@/stores/bastion';
 import { useResourceStore } from '@/stores/resources';
+import { useDungeonStore } from '@/stores/dungeon';
 import {
   BASTION_WORKER_SLOTS,
   BASTION_MAX_HP,
@@ -11,6 +12,7 @@ import {
   BASTION_HEAL_HERB_COST,
   WORKER_HERB_RATE,
   WORKER_CRYSTAL_RATE,
+  WORKER_SCHOLAR_XP_RATE,
   WORKER_SCOUT_RATE,
   WORKER_LEVEL_MULTIPLIER,
   WORKER_UPGRADE_CRYSTAL_COSTS,
@@ -20,13 +22,14 @@ import type { WorkerType, BastionWorker } from '@undead/shared';
 const WORKER_INFO: Record<WorkerType, { label: string; rateLabel: string; baseRate: number }> = {
   herbalist: { label: 'Kr\u00e4uterkundler', rateLabel: 'Kr\u00e4uter/h', baseRate: WORKER_HERB_RATE },
   miner: { label: 'Sch\u00fcrfer', rateLabel: 'Kristalle/h', baseRate: WORKER_CRYSTAL_RATE },
-  scholar: { label: 'Gelehrter', rateLabel: 'XP/h', baseRate: 5 },
+  scholar: { label: 'Gelehrter', rateLabel: 'XP/h', baseRate: WORKER_SCHOLAR_XP_RATE },
   scout: { label: 'Sp\u00e4her', rateLabel: 'Berichte/h', baseRate: WORKER_SCOUT_RATE },
 };
 
-const STORAGE_ITEMS: { key: 'herbs' | 'crystals' | 'relics' | 'scoutReports'; maxKey: string; label: string; icon: ImageSourcePropType; color: string; workerType: WorkerType | null }[] = [
+const STORAGE_ITEMS: { key: string; maxKey: string; label: string; icon: ImageSourcePropType | null; color: string; workerType: WorkerType | null }[] = [
   { key: 'herbs', maxKey: 'maxHerbs', label: 'Kr\u00e4uter', icon: icons.herb, color: colors.cityState, workerType: 'herbalist' },
   { key: 'crystals', maxKey: 'maxCrystals', label: 'Kristalle', icon: icons.crystal, color: '#8e44ad', workerType: 'miner' },
+  { key: 'xp', maxKey: 'maxXp', label: 'Erfahrung', icon: null, color: '#3498db', workerType: 'scholar' },
   { key: 'relics', maxKey: 'maxRelics', label: 'Reliquien', icon: icons.relic, color: colors.gold, workerType: null },
   { key: 'scoutReports', maxKey: 'maxScoutReports', label: 'Berichte', icon: icons.vision, color: colors.player, workerType: 'scout' },
 ];
@@ -36,6 +39,7 @@ const WORKER_TYPES: WorkerType[] = ['herbalist', 'miner', 'scholar', 'scout'];
 const WORKER_RATE_MAP: Record<string, number> = {
   herbalist: WORKER_HERB_RATE,
   miner: WORKER_CRYSTAL_RATE,
+  scholar: WORKER_SCHOLAR_XP_RATE,
   scout: WORKER_SCOUT_RATE,
 };
 
@@ -95,7 +99,9 @@ export function BastionInterior() {
   const maxSlots = BASTION_WORKER_SLOTS[Math.min(bastion.level, 2)];
   const freeSlots = maxSlots - workers.length;
   const [collecting, setCollecting] = useState(false);
-  const hasStorage = storage && (storage.herbs > 0 || storage.crystals > 0 || storage.relics > 0 || storage.scoutReports > 0);
+  const [usingReport, setUsingReport] = useState(false);
+  const hasStorage = storage && (storage.herbs > 0 || storage.crystals > 0 || storage.relics > 0 || storage.xp > 0 || storage.scoutReports > 0);
+  const hasReports = storage && storage.scoutReports > 0;
 
   const handleCollect = async () => {
     setCollecting(true);
@@ -103,6 +109,19 @@ export function BastionInterior() {
     setCollecting(false);
     if (!ok) {
       Alert.alert('Fehler', 'Einsammeln fehlgeschlagen. Pr\u00fcfe deine Verbindung.');
+    }
+  };
+
+  const handleUseReport = async () => {
+    setUsingReport(true);
+    const dungeon = await useBastionStore.getState().useReport();
+    setUsingReport(false);
+    if (dungeon) {
+      // Refresh dungeon list so the new dungeon appears on the map
+      useDungeonStore.getState().fetchDungeons();
+      Alert.alert('Dungeon entdeckt!', `"${dungeon.name}" wurde in der N\u00e4he deiner Bastion gefunden.`);
+    } else {
+      Alert.alert('Fehler', 'Keine Sp\u00e4herberichte verf\u00fcgbar.');
     }
   };
 
@@ -219,6 +238,19 @@ export function BastionInterior() {
             </Text>
           </TouchableOpacity>
 
+          {hasReports && (
+            <TouchableOpacity
+              style={[styles.reportButton, usingReport && styles.buttonDisabled]}
+              onPress={handleUseReport}
+              disabled={usingReport}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.reportButtonText}>
+                {usingReport ? 'Wird erkundet...' : `Sp\u00e4herbericht einsetzen (${storage.scoutReports})`}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {storage.lastCollectedAt > 0 && (
             <Text style={styles.lastCollectedText}>
               Zuletzt gesammelt {formatTimeSince(storage.lastCollectedAt)}
@@ -286,12 +318,16 @@ export function BastionInterior() {
 }
 
 function StorageBar({ label, icon, current, max, color }: {
-  label: string; icon: ImageSourcePropType; current: number; max: number; color: string;
+  label: string; icon: ImageSourcePropType | null; current: number; max: number; color: string;
 }) {
   const percent = max > 0 ? Math.min(100, Math.round((current / max) * 100)) : 0;
   return (
     <View style={styles.storageRow}>
-      <Image source={icon} style={styles.storageIconImg} />
+      {icon ? (
+        <Image source={icon} style={styles.storageIconImg} />
+      ) : (
+        <Text style={[styles.storageIconText, { color }]}>XP</Text>
+      )}
       <View style={styles.storageBarContainer}>
         <View style={styles.storageBarBg}>
           <View style={[styles.storageBarFill, { width: `${percent}%`, backgroundColor: color }]} />
@@ -385,6 +421,13 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
   },
+  storageIconText: {
+    width: 20,
+    fontSize: 11,
+    fontFamily: fontFamily.body,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   storageBarContainer: {
     flex: 1,
     gap: spacing.xs,
@@ -475,6 +518,21 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontFamily: fontFamily.body,
     fontWeight: '700',
+  },
+  reportButton: {
+    backgroundColor: colors.player,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.gold + '30',
+  },
+  reportButtonText: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontFamily: fontFamily.body,
+    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.4,

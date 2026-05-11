@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, fontFamily } from '@/theme';
 import { icons, visionIcon } from '@/assets';
@@ -22,6 +22,13 @@ export function VisionCard({ visible, onClose }: VisionCardProps) {
   const vision = useDailyStore((s) => s.vision);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawn, setDrawn] = useState(false);
+
+  // If a vision already exists when the card opens, mark as drawn so we show it directly
+  useEffect(() => {
+    if (visible && vision && !drawn) {
+      setDrawn(true);
+    }
+  }, [visible, vision]);
 
   const handleDraw = async () => {
     setIsDrawing(true);

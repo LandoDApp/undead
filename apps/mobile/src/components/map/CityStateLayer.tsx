@@ -78,6 +78,7 @@ interface CityStateLayerProps {
     maxCharge?: number;
     upgradeLevel?: number;
     baseRadius?: number;
+    dominantClan?: string | null;
   }) => void;
 }
 
@@ -100,6 +101,7 @@ export function CityStateLayer({ onZonePress }: CityStateLayerProps) {
           maxCharge: zone.maxCharge,
           upgradeLevel: zone.upgradeLevel,
           baseRadius: zone.baseRadius,
+          dominantClan: zone.dominantClan ?? null,
         },
         geometry: {
           type: 'Polygon' as const,
@@ -168,6 +170,7 @@ export function CityStateLayer({ onZonePress }: CityStateLayerProps) {
           maxCharge: feature.properties.maxCharge,
           upgradeLevel: feature.properties.upgradeLevel,
           baseRadius: feature.properties.baseRadius,
+          dominantClan: feature.properties.dominantClan,
         });
       }
     },

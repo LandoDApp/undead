@@ -10,6 +10,8 @@ let GhoulMarkers: any = null;
 let CityStateLayer: any = null;
 let ZoneInfoModal: any = null;
 let ResourceMarkers: any = null;
+let ChestMarkers: any = null;
+let DungeonLayer: any = null;
 
 try {
   MapLibreGL = require('@maplibre/maplibre-react-native').default;
@@ -18,6 +20,8 @@ try {
   CityStateLayer = require('./CityStateLayer').CityStateLayer;
   ZoneInfoModal = require('./ZoneInfoModal').ZoneInfoModal;
   ResourceMarkers = require('./ResourceMarkers').ResourceMarkers;
+  ChestMarkers = require('./ChestMarkers').ChestMarkers;
+  DungeonLayer = require('./DungeonLayer').DungeonLayer;
 } catch {}
 
 const MAPTILER_KEY = Constants.expoConfig?.extra?.mapTilerKey;
@@ -439,7 +443,9 @@ const GameMapInner = memo(forwardRef<GameMapHandle, { mapStyle: any }>(function 
           />
 
           <CityStateLayer onZonePress={handleZonePress} />
+          {DungeonLayer && <DungeonLayer />}
           {ResourceMarkers && <ResourceMarkers />}
+          {ChestMarkers && <ChestMarkers />}
           <GhoulMarkers />
           <PlayerMarker />
         </MapLibreGL.MapView>
